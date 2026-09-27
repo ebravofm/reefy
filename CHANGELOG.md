@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.1.0] - 2026-09-27
+
+**Version**: 2.1.0 (Build 1)
+
+Caught up to current Swiftfin — everything in 1.6 and 1.6.1, plus what's landed on `main`
+since. The 1.5 rebase made this a normal merge instead of a rewrite, which is the whole point:
+Reefy stays close to upstream and carries only what upstream doesn't do yet.
+
+### Added (from upstream)
+
+- **Sidebar tab bar**, with a setting for the classic centered bar (Settings → Customize →
+  Tab bar).
+- **Library filters on tvOS**, upstream's own.
+- **Season pages**, and a reworked item page where the version and track pickers sit with the
+  other action buttons.
+- **Live TV guide** and recordings.
+- **Settings**: maximum resolution, force subtitle burn-in, hide recommendations, hide poster
+  labels.
+- **MPV player**, behind an experimental toggle. VLC is still the default, and the only player
+  Reefy's playback features are tested against.
+- Playback pauses when the app goes to the background.
+- `jellyfin://` deep links. `reefy://` links work now too — they never actually did before.
+
+### Changed
+
+- Coral replaces purple in the new places upstream hardcoded it: sign-in buttons and the
+  played tint.
+- The player moved from VLCKit to SwiftVLC upstream. Carthage is gone from the build.
+
+### Removed
+
+- Reefy's tvOS filter bar and icon-only tab bar — upstream shipped its own of both.
+- The orange position marker while scrubbing. Upstream rewrote the slider and it no longer
+  has a tick to color.
+
+---
+
 ## [2.0.1] - 2026-07-28
 
 **Version**: 2.0.1 (Build 1)
