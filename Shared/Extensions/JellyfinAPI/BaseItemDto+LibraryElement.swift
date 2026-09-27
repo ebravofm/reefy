@@ -103,7 +103,7 @@ private struct BaseItemDtoLibraryListElement: View {
                 type: resolvedLibraryStyle.posterDisplayType,
                 size: .extraSmall
             )
-            .posterShadow()
+            .subtleShadow()
             .frame(width: resolvedLibraryStyle.posterDisplayType == .landscape ? baseItemListLandscapeWidth : baseItemListPortraitWidth)
         } content: {
             VStack(alignment: .leading, spacing: 5) {
@@ -114,19 +114,61 @@ private struct BaseItemDtoLibraryListElement: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                accessoryView
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let program = item.currentProgram {
+                    currentProgramView(program)
+                } else if item.type == .program {
+                    currentProgramView(item)
+                } else {
+                    accessoryView
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } action: {
             item.libraryDidSelectElement(router: router, in: namespace)
         }
-        .backport
         .matchedTransitionSource(id: "item", in: namespace)
         #if os(tvOS)
-            .focusedValue(\.focusedPoster, AnyPoster(item))
+        .focusedValue(\.focusedPoster, AnyPoster(item))
         #endif
+    }
+
+    @ViewBuilder
+    private func currentProgramView(_ program: BaseItemDto) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if program.id != item.id {
+                Text(program.displayTitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+
+            if let progress = program.progressPercentage {
+                ProgressView(value: progress)
+                    .progressViewStyle(.playback)
+                    .frame(height: 4)
+                    .foregroundStyle(Color.accentColor)
+            }
+
+            if let start = program.startDate, let end = program.endDate {
+                DotHStack {
+                    if !Calendar.current.isDateInToday(start) {
+                        Text(start, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
+                    }
+
+                    Text(start, style: .time)
+                    Text(end, style: .time)
+
+                    if program.isRecording && program.isAiring {
+                        Text(L10n.recording)
+                            .foregroundStyle(.red)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
     }
 
     @ViewBuilder

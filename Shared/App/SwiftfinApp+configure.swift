@@ -7,7 +7,6 @@
 //
 
 import CoreStore
-import Defaults
 import FactoryKit
 import Logging
 import Nuke
@@ -18,19 +17,15 @@ extension SwiftfinApp {
 
     static func configure() {
 
-        #if DEBUG
-        SwizzleDefaults.set(Defaults[.isLiquidGlassEnabled], for: "com.apple.SwiftUI.IgnoreSolariumOptOut")
-        #endif
-
         // Logging
         LoggingSystem.bootstrap { label in
 
             // TODO: have setting for log level
             //       - default info, boolean to go down to trace
             let handlers: [any LogHandler] = [PersistentLogHandler(label: label)]
-            #if DEBUG
-                .appending(SwiftfinConsoleHandler())
-            #endif
+                #if DEBUG
+                    .appending(SwiftfinConsoleHandler())
+                #endif
 
             var multiplexHandler = MultiplexLogHandler(handlers)
             multiplexHandler.logLevel = .trace

@@ -6,7 +6,6 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import Engine
 import SwiftUI
 
 struct ColorPicker: View {
@@ -35,15 +34,16 @@ struct ColorPicker: View {
                 Text(title)
             }
         }
-        ._alert(
-            title,
-            isPresented: $isPresented
-        ) {
+        .sheet(isPresented: $isPresented) {
             StateAdapter(initialValue: selection.wrappedValue) { color in
-                Self._Alert(value: color)
-                    .onDisappear {
-                        selection.wrappedValue = color.wrappedValue
-                    }
+                Self.Sheet(
+                    title: title,
+                    value: color,
+                    supportsOpacity: supportsOpacity
+                )
+                .onDisappear {
+                    selection.wrappedValue = color.wrappedValue
+                }
             }
         }
     }

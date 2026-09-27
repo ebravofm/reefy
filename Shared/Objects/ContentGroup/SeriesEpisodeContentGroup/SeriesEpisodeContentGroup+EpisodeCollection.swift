@@ -167,14 +167,6 @@ extension SeriesEpisodeContentGroup {
             #endif
         }
 
-        private static var itemSpacing: CGFloat {
-            #if os(tvOS)
-            40
-            #else
-            EdgeInsets.edgePadding / 2
-            #endif
-        }
-
         var body: some View {
             ContentGroupSection {
                 CollectionHStack(
@@ -183,14 +175,17 @@ extension SeriesEpisodeContentGroup {
                 ) { element in
                     content(element)
                         .focused($focusedElement, equals: element.id)
+                        #if os(tvOS)
+                        .ignoresSafeArea()
+                        #endif
                 }
+                .initialElement(id: preferredElementID)
                 .clipsToBounds(false)
                 .insets(horizontal: EdgeInsets.edgePadding)
-                .itemSpacing(Self.itemSpacing)
+                .itemSpacing(EdgeInsets.itemSpacing)
                 .scrollBehavior(.continuousLeadingEdge)
                 .focusSection()
                 .focused($focusedSection, equals: .episodes)
-                .backport
                 .defaultFocus(
                     $focusedElement,
                     preferredElementID,
@@ -202,12 +197,13 @@ extension SeriesEpisodeContentGroup {
                     .focused($focusedSection, equals: .seasons)
             }
             .focusSection()
-            .backport
             .defaultFocus(
                 $focusedSection,
                 .episodes,
                 priority: .userInitiated
             )
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(L10n.seasons)
         }
     }
 

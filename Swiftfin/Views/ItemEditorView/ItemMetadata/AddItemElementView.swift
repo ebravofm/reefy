@@ -7,7 +7,6 @@
 //
 
 import Combine
-import Defaults
 import JellyfinAPI
 import SwiftUI
 
@@ -51,7 +50,7 @@ struct AddItemElementView<Editor: ItemComponentEditor>: View {
             )
         }
         .navigationTitle(viewModel.editor.displayTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbarTitleDisplayMode(.inline)
         .navigationBarCloseButton {
             router.dismiss()
         }
@@ -60,14 +59,24 @@ struct AddItemElementView<Editor: ItemComponentEditor>: View {
                 ProgressView()
             }
 
-            Button(L10n.save) {
+            let saveAction: () -> Void = {
                 viewModel.add([viewModel.editor.makeElement(input: input)])
             }
-            .buttonStyle(.toolbarPill)
+
+            Group {
+                if #available(iOS 26, *) {
+                    Button(L10n.save, role: .confirm, action: saveAction)
+                } else {
+                    Button(L10n.save, action: saveAction)
+                        .backport
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.small)
+                }
+            }
             .enabled(isValid)
         }
-        .onChange(of: input.name) { newName in
-            viewModel.search(newName)
+        .onChange(of: input.name) {
+            viewModel.search(input.name)
         }
         .onReceive(viewModel.events) { event in
             switch event {

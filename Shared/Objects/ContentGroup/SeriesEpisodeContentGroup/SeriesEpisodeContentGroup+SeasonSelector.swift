@@ -22,8 +22,6 @@ extension SeriesEpisodeContentGroup {
 
         @FocusState
         private var focusedSeason: PagingLibraryViewModel<EpisodeLibrary>.ID?
-        @FocusState
-        private var isPickerFocused: Bool
 
         private var selectedSeason: PagingLibraryViewModel<EpisodeLibrary>? {
             seasons.first { $0.id == selection }
@@ -42,29 +40,19 @@ extension SeriesEpisodeContentGroup {
                 title(L10n.episodes)
             } else {
                 ScrollView(.horizontal) {
-                    HStack(spacing: 20) {
-                        ForEach(seasons) { season in
-                            let isSelected = selection == season.id
-
-                            Button {
-                                selection = season.id
-                            } label: {
-                                EmptyLabel(season.library.parent.displayTitle)
-                            }
-                            .buttonStyle(SeasonButtonStyle(isPickerFocused: isPickerFocused))
-                            .isSelected(isSelected)
-                            .focused($focusedSeason, equals: season.id)
-                            .accessibilityAddTraits(isSelected ? .isSelected : [])
-                        }
+                    SelectionTrack(
+                        seasons,
+                        selection: selection,
+                        focus: $focusedSeason
+                    ) { season in
+                        selection = season.id
                     }
+                    .controlSize(.large)
                     .edgePadding(.horizontal)
                 }
                 .scrollIndicators(.hidden)
-                .backport
                 .scrollClipDisabled()
                 .focusSection()
-                .focused($isPickerFocused)
-                .backport
                 .defaultFocus(
                     $focusedSeason,
                     preferredSelection,
@@ -96,51 +84,6 @@ extension SeriesEpisodeContentGroup {
             selection = seasonID
         }
 
-        private struct SeasonButtonStyle: ButtonStyle {
-
-            @Environment(\.isFocused)
-            private var isFocused
-            @Environment(\.isSelected)
-            private var isSelected
-
-            let isPickerFocused: Bool
-
-            private var isHighlighted: Bool {
-                isFocused || (!isPickerFocused && isSelected)
-            }
-
-            @ViewBuilder
-            private func label(_ configuration: Configuration) -> some View {
-                if isHighlighted {
-                    configuration.label
-                        .foregroundStyle(.black)
-                        .labelStyle(
-                            CapsuleLabelStyle(
-                                tint: .white
-                            )
-                        )
-                } else {
-                    configuration.label
-                        .foregroundStyle(.primary)
-                        .labelStyle(.titleOnly)
-                        .padding(CapsuleLabelStyle.defaultInsets)
-                }
-            }
-
-            func makeBody(configuration: Configuration) -> some View {
-                label(configuration)
-                    .font(.callout)
-                    .fontWeight(.semibold)
-                    .scaleEffect(isFocused ? 1.06 : 1)
-                    .shadow(
-                        color: isFocused ? .black.opacity(0.5) : .clear,
-                        radius: isFocused ? 10 : 0
-                    )
-                    .animation(.easeInOut(duration: 0.1), value: isFocused)
-                    .animation(.easeInOut(duration: 0.1), value: isHighlighted)
-            }
-        }
-
         var iOSView: some View {
             if seasons.count <= 1 {
                 title(selectedSeason?.library.parent.displayTitle ?? L10n.episodes)
@@ -156,12 +99,8 @@ extension SeriesEpisodeContentGroup {
                         }
                     }
                 }
-                .labelStyle(
-                    CapsuleLabelStyle(
-                        isIconTrailing: true
-                    )
-                )
-                .font(.headline)
+                .labelStyle(.trailingIcon)
+                .buttonStyle(.capsule)
                 .edgePadding(.horizontal)
             }
         }

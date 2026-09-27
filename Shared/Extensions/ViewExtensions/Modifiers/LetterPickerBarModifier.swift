@@ -19,23 +19,30 @@ struct LetterPickerBarModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if let edge = letterPickerOrientation.edge,
-           let viewModel
+           let viewModel,
+           !viewModel.staticFilters.containsFilters(ofType: .letter)
         {
             content
                 .focusSection()
                 .ignoresSafeArea(.all, edges: edge == .leading ? .trailing : .leading)
                 .safeAreaInset(edge: edge, alignment: .center, spacing: 0) {
                     LetterPickerBar(viewModel: viewModel)
-                        .if(!UIDevice.isTV) { view in
-                            view
-                                .padding(.vertical, EdgeInsets.edgePadding / 2)
-                                .padding(edge == .leading ? .leading : .trailing, EdgeInsets.edgePadding / 2)
+                        #if os(tvOS)
+                            .coordinatedFocus(.secondary)
+                        #endif
+                        .padding(edge.asEdgeSet, EdgeInsets.itemSpacing)
+                }
+                #if os(tvOS)
+                .ignoresSafeArea(.all, edges: edge.asEdgeSet)
+                #endif
+                .overlayPreferenceValue(LetterPickerActiveLetterKey.self) { letter in
+                    ZStack {
+                        if let letter {
+                            LetterPickerBar.LetterPickerCallout(letter: letter)
+                                .font(.system(size: UIDevice.isTV ? 128 : 64, design: .rounded))
+                                .fontWeight(.bold)
                         }
-                        .if(UIDevice.isTV) { view in
-                            view
-                                .offset(x: edge == .leading ? -EdgeInsets.edgePadding / 1.5 : EdgeInsets.edgePadding / 1.5)
-                                .focusSection()
-                        }
+                    }
                 }
         } else {
             content

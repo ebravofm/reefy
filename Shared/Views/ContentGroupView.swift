@@ -14,12 +14,21 @@ import SwiftUI
 
 struct ContentGroupView<Provider: ContentGroupProvider>: View {
 
+    private enum Focus: String {
+        case content = "contentGroup-content"
+    }
+
+    @Environment(\.tabSafeAreaInsets)
+    private var tabSafeAreaInsets
+
     @Router
     private var router
 
     @State
     private var contentGroupOptions: ContentGroupParentOption = .init()
 
+    @StateObject
+    private var focusCoordinator = FocusCoordinator(waitingFor: Focus.content.rawValue, focusPlaceholder: true)
     @StateObject
     private var viewModel: ContentGroupViewModel<Provider>
 
@@ -41,15 +50,21 @@ struct ContentGroupView<Provider: ContentGroupProvider>: View {
 
                     ContentGroupVStack(groups: viewModel.groups)
                         .edgePadding(contentGroupOptions.contains(.ignoreSafeAreaTop) ? .bottom : .vertical)
+                        .padding(.top, contentGroupOptions.contains(.ignoreSafeAreaTop) ? 0 : tabSafeAreaInsets.top)
                         .onPreferenceChange(ContentGroupCustomizationKey.self) { value in
                             contentGroupOptions = value
                         }
                 }
             }
             .trackingFrame(for: .scrollView)
+            #if os(tvOS)
+            .coordinatedFocus(Focus.content.rawValue)
+            .ignoresSafeArea(.container, edges: [.horizontal, .top])
+            #else
             .ignoresSafeArea(
                 edges: contentGroupOptions.contains(.ignoreSafeAreaTop) ? [.horizontal, .top] : .horizontal
             )
+            #endif
             .scrollIndicators(.hidden)
             .refreshable {
                 await viewModel.background.refresh()
@@ -69,27 +84,43 @@ struct ContentGroupView<Provider: ContentGroupProvider>: View {
             switch viewModel.state {
             case .content:
                 if viewModel.groups.isEmpty {
-                    // TODO: non-error like empty view
-                    ErrorView(error: ErrorMessage(L10n.noResults))
-                        .refreshable {
-                            viewModel.refresh()
-                        }
+                    ContentUnavailableView(
+                        L10n.noResults.localizedCapitalized,
+                        systemImage: "rectangle.on.rectangle.slash"
+                    )
+                    .focusable()
+                    #if os(tvOS)
+                    .coordinatedFocus(.fallback)
+                    #endif
                 } else {
                     contentView
                 }
             case .error:
                 viewModel.error.map(ErrorView.init)
+                    #if os(tvOS)
+                        .coordinatedFocus(.fallback)
+                    #endif
             case .initial, .refreshing:
                 ProgressView()
+                    #if os(tvOS)
+                        .coordinatedFocus(.placeholder)
+                    #endif
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea(edges: .all)
             }
         }
         .animation(.linear(duration: 0.2), value: viewModel.state)
         .animation(.linear(duration: 0.2), value: viewModel.background.states)
         .navigationTitle(viewModel.provider.displayTitle)
-        .backport
+        #if os(iOS)
         .toolbarTitleDisplayMode(router.isRootOfPath ? .inlineLarge : .inline)
-        .toolbar(UIDevice.isTV && router.isRootOfPath ? .hidden : .automatic, for: .navigationBar)
+        #elseif os(tvOS)
+        .toolbar(router.isRootOfPath ? .hidden : .automatic, for: .navigationBar)
+        #endif
         .onFirstAppear {
+            viewModel.refresh()
+        }
+        .refreshable {
             viewModel.refresh()
         }
         .sinceLastDisappear { interval in
@@ -99,9 +130,12 @@ struct ContentGroupView<Provider: ContentGroupProvider>: View {
             viewModel.refreshIfPendingChanges()
         }
         .topBarTrailing {
-            if viewModel.background.is(.refreshing) {
-                ProgressView()
+            if #unavailable(iOS 26.0) {
+                if viewModel.background.is(.refreshing) {
+                    ProgressView()
+                }
             }
         }
+        .environmentObject(focusCoordinator)
     }
 }

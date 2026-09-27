@@ -146,27 +146,6 @@ extension StoredValues.Keys {
             )
         }
 
-        static var enableItemEditing: Key<Bool> {
-            CurrentUserKey(
-                field: "enableItemEditing",
-                default: false
-            )
-        }
-
-        static var enableItemDeletion: Key<Bool> {
-            CurrentUserKey(
-                field: "enableItemDeletion",
-                default: false
-            )
-        }
-
-        static var enableCollectionManagement: Key<Bool> {
-            CurrentUserKey(
-                field: "enableCollectionManagement",
-                default: false
-            )
-        }
-
         static var enabledTrailers: Key<TrailerSelection> {
             CurrentUserKey(
                 field: "enabledTrailers",
@@ -211,6 +190,13 @@ extension StoredValues.Keys {
                 itemID,
                 field: "stickySubtitleLanguage",
                 default: ""
+            )
+        }
+
+        static var forceSubtitleBurnIn: Key<Bool> {
+            CurrentUserKey(
+                field: "forceSubtitleBurnIn",
+                default: false
             )
         }
     }

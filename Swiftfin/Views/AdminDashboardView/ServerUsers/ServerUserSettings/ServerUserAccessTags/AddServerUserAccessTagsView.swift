@@ -91,7 +91,6 @@ struct AddServerUserAccessTagsView: View {
                 existsOnServer: existsOnServer
             )
         }
-        .backport
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle(L10n.addAccessTag.localizedCapitalized)
         .navigationBarCloseButton {
@@ -106,12 +105,15 @@ struct AddServerUserAccessTagsView: View {
             }
 
             if viewModel.background.states.contains(.updating) {
-                Button(L10n.cancel) {
+                Button(L10n.cancel, role: .cancel) {
                     viewModel.cancel()
                 }
-                .buttonStyle(.toolbarPill(.red))
+                .foregroundStyle(.primary, .secondary)
+                .backport
+                .buttonStyle(.glass)
+                .controlSize(.small)
             } else {
-                Button(L10n.save) {
+                let saveAction: () -> Void = {
                     if access {
                         tempPolicy.allowedTags = tempPolicy.allowedTags
                             .appendedOrInit(input.name)
@@ -122,12 +124,22 @@ struct AddServerUserAccessTagsView: View {
 
                     viewModel.updatePolicy(tempPolicy)
                 }
-                .buttonStyle(.toolbarPill)
-                .disabled(!isValid)
+
+                Group {
+                    if #available(iOS 26, *) {
+                        Button(L10n.save, role: .confirm, action: saveAction)
+                    } else {
+                        Button(L10n.save, action: saveAction)
+                            .backport
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.small)
+                    }
+                }
+                .enabled(isValid)
             }
         }
-        .onChange(of: input.name) { newTag in
-            tagViewModel.search(newTag)
+        .onChange(of: input.name) {
+            tagViewModel.search(input.name)
         }
         .onReceive(viewModel.events) { event in
             switch event {

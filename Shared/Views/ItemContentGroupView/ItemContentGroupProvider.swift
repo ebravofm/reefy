@@ -6,6 +6,7 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
+import Defaults
 import Get
 import JellyfinAPI
 import SwiftUI
@@ -17,11 +18,12 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
     @Published
     private(set) var localTrailers: [BaseItemDto] = []
     @Published
-    private(set) var playButtonItem: BaseItemDto?
+    private(set) var mediaPlayerItemProvider: MediaPlayerItemProvider?
     @Published
     private(set) var randomBackdropItem: BaseItemDto?
+
     @Published
-    var selectedMediaSource: MediaSourceInfo?
+    var isPresentingDeleteConfirmation = false
 
     let id: String
 
@@ -42,15 +44,19 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
     }
 
     func makeGroups(environment: Empty) async throws -> [any ContentGroup] {
-        let fullItem = try await item.getFullItem(userSession: requireUserSession(), sendNotification: true)
-        let newPlayButtonItem = try await playButtonItem(for: fullItem)
+        let userSession = try requireUserSession()
+        let fullItem = try await item.getFullItem(userSession: userSession, sendNotification: true)
+        let newMediaPlayerItemProvider = try await resolveMediaPlayerItemProvider(
+            for: fullItem,
+            userSession: userSession
+        )
         let newLocalTrailers = try? await localTrailers(for: fullItem)
         let newRandomBackdropItem = try? await randomBackdropItem(for: fullItem)
 
         item = fullItem
         localTrailers = newLocalTrailers ?? []
+        mediaPlayerItemProvider = newMediaPlayerItemProvider
         randomBackdropItem = newRandomBackdropItem
-        setPlayButtonItem(newPlayButtonItem)
 
         return try await _makeGroups(
             item: fullItem,
@@ -82,11 +88,14 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
             )
         }
 
-        if item.type == .series {
+        switch item.type {
+        case .season, .series:
             SeriesEpisodeContentGroup(
-                series: item,
-                playButtonItem: playButtonItem
+                parent: item,
+                playButtonItem: mediaPlayerItemProvider?.item
             )
+        default:
+            []
         }
 
         if let genres = item.itemGenres, genres.isNotEmpty {
@@ -162,10 +171,50 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
                 parent: item
             )
             .makeGroups(environment: .default)
+        case .series:
+            try await ItemTypeContentGroupProvider(
+                itemTypes: [.season],
+                parent: item
+            )
+            .makeGroups(environment: .default)
+        case .channel, .liveTvChannel, .tvChannel:
+            PosterGroup(
+                id: "channel-programs",
+                library: ChannelScheduleLibrary(channel: item),
+                posterDisplayType: .landscape,
+                posterSize: .small
+            )
         default: []
         }
 
-        if let castAndCrew = item.people, castAndCrew.isNotEmpty {
+        if item.type == .episode {
+            PosterGroup(
+                library: StaticLibrary(
+                    title: L10n.season,
+                    id: "seasons",
+                    elements: [BaseItemDto(
+                        id: item.seasonID,
+                        imageTags: item.parentPrimaryImageItemID == item.seasonID
+                            ? item.parentPrimaryImageTag.map { [ImageType.primary.rawValue: $0] }
+                            : nil,
+                        name: item.seasonName,
+                        parentBackdropImageTags: item.parentBackdropImageTags,
+                        parentBackdropItemID: item.parentBackdropItemID,
+                        parentThumbImageTag: item.parentThumbImageTag,
+                        parentThumbItemID: item.parentThumbItemID,
+                        seriesID: item.seriesID,
+                        seriesName: item.seriesName,
+                        seriesPrimaryImageTag: item.seriesPrimaryImageTag,
+                        seriesThumbImageTag: item.seriesThumbImageTag,
+                        type: .season
+                    )]
+                ),
+                posterSize: .small,
+                environment: .init(isHeaderButtonEnabled: false)
+            )
+        }
+
+        if let castAndCrew = item.mergedPeople, castAndCrew.isNotEmpty {
             PosterGroup(
                 id: "cast-and-crew",
                 library: StaticLibrary(
@@ -185,12 +234,14 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
             posterSize: .small
         )
 
-        PosterGroup(
-            id: "similar-items",
-            library: SimilarItemsLibrary(itemID: itemID),
-            posterDisplayType: .landscape,
-            posterSize: .small
-        )
+        if Defaults[.Customization.shouldShowRecommendations] {
+            PosterGroup(
+                id: "similar-items",
+                library: SimilarItemsLibrary(itemID: itemID, itemType: item.type),
+                posterDisplayType: .landscape,
+                posterSize: .small
+            )
+        }
 
         AboutItemGroup(
             displayTitle: L10n.about,
@@ -221,30 +272,79 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
         }
     }
 
-    private func setPlayButtonItem(_ item: BaseItemDto?) {
-        playButtonItem = item
-        selectedMediaSource = item?.mediaSources?.first
+    enum PlaybackSelection {
+        case mediaSource(MediaSourceInfo?)
+        case audioStreamIndex(Int?)
+        case subtitleStreamIndex(Int?)
+        case bitrate(PlaybackBitrate)
     }
 
-    private func playButtonItem(for item: BaseItemDto) async throws -> BaseItemDto? {
-        guard item.type == .series else {
-            return item.isPlayable ? item : nil
+    func select(_ selection: PlaybackSelection) {
+        guard let provider = mediaPlayerItemProvider, let userSession else { return }
+
+        var mediaSource = provider.mediaSource
+        var audioStreamIndex = provider.audioStreamIndex
+        var subtitleStreamIndex = provider.subtitleStreamIndex
+        var requestedBitrate = provider.requestedBitrate
+
+        switch selection {
+        case let .mediaSource(source):
+            mediaSource = source
+            audioStreamIndex = nil
+            subtitleStreamIndex = nil
+        case let .audioStreamIndex(index):
+            audioStreamIndex = index
+        case let .subtitleStreamIndex(index):
+            subtitleStreamIndex = index
+        case let .bitrate(bitrate):
+            requestedBitrate = bitrate
         }
 
-        if let nextUp = try await nextUpItem(for: item) {
-            return nextUp
+        mediaPlayerItemProvider = provider.item.getPlaybackItemProvider(
+            userSession: userSession,
+            mediaSource: mediaSource,
+            audioStreamIndex: audioStreamIndex,
+            subtitleStreamIndex: subtitleStreamIndex,
+            requestedBitrate: requestedBitrate
+        )
+    }
+
+    private func resolveMediaPlayerItemProvider(
+        for item: BaseItemDto,
+        userSession: UserSession
+    ) async throws -> MediaPlayerItemProvider? {
+        let playbackItem: BaseItemDto? = switch item.type {
+        case .series:
+            if let nextUp = try await nextUpItem(for: item) {
+                nextUp
+            } else if let resumeItem = try await resumeItem(for: item) {
+                resumeItem
+            } else {
+                try await firstAvailableItem(for: item)
+            }
+        case .season:
+            if let resumeItem = try await resumeItem(for: item) {
+                resumeItem
+            } else {
+                try await firstAvailableItem(for: item)
+            }
+        default:
+            item.isPlayable ? item : nil
         }
 
-        if let resumeItem = try await resumeItem(for: item) {
-            return resumeItem
+        guard let playbackItem else { return nil }
+
+        let fullPlaybackItem = if item.type == .series || item.type == .season {
+            try await playbackItem.getFullItem(userSession: userSession)
+        } else {
+            playbackItem
         }
 
-        return try await firstAvailableItem(for: item)
+        return fullPlaybackItem.getPlaybackItemProvider(userSession: userSession)
     }
 
     private func nextUpItem(for item: BaseItemDto) async throws -> BaseItemDto? {
         var parameters = Paths.GetNextUpParameters()
-        parameters.fields = .MinimumFields
         parameters.seriesID = item.id
 
         let request = Paths.getNextUp(parameters: parameters)
@@ -259,7 +359,6 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
 
     private func resumeItem(for item: BaseItemDto) async throws -> BaseItemDto? {
         var parameters = Paths.GetResumeItemsParameters()
-        parameters.fields = .MinimumFields
         parameters.limit = 1
         parameters.parentID = item.id
 
@@ -271,8 +370,8 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
 
     private func firstAvailableItem(for item: BaseItemDto) async throws -> BaseItemDto? {
         var parameters = Paths.GetItemsParameters()
-        parameters.fields = .MinimumFields
         parameters.includeItemTypes = [.episode]
+        parameters.isMissing = false
         parameters.isRecursive = true
         parameters.limit = 1
         parameters.parentID = item.id
@@ -299,7 +398,6 @@ final class ItemContentGroupProvider: ViewModel, ContentGroupProvider {
         }
 
         var parameters = Paths.GetItemsParameters()
-        parameters.fields = .MinimumFields
         parameters.includeItemTypes = [.movie, .series]
         parameters.isRecursive = true
         parameters.limit = 1

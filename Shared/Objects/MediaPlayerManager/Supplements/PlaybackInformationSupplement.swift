@@ -20,6 +20,7 @@ class PlaybackInformationSupplement: ObservableObject, MediaPlayerSupplement {
 
     let displayTitle: String = L10n.session
     let itemID: String
+    let presentationStyle: MediaPlayerSupplementPresentationStyle = .expanded
     let provider: PlaybackInformationProvider
 
     var id: String {
@@ -98,12 +99,12 @@ extension PlaybackInformationSupplement {
                     .padding(.vertical, 4)
 
                 if let width = videoStream?.width, let height = videoStream?.height {
-                    LabeledContent(L10n.videoResolution, value: "\(width)x\(height)")
+                    LabeledContent(L10n.videoResolution, value: height.description.multiply(by: width.description))
                 }
 
                 if let proxy = manager.proxy as? any VideoMediaPlayerProxy {
-                    LabeledContent(L10n.droppedFrames, value: "\(proxy.droppedFrames.value)")
-                    LabeledContent(L10n.corruptedFrames, value: "\(proxy.corruptedFrames.value)")
+                    LabeledContent(L10n.droppedFrames, value: proxy.droppedFrames.value.description)
+                    LabeledContent(L10n.corruptedFrames, value: proxy.corruptedFrames.value.description)
                 }
             }
         }
@@ -222,6 +223,7 @@ extension PlaybackInformationSupplement {
             .labeledContentStyle(.playbackInfo)
             .padding(.leading, safeAreaInsets.leading)
             .padding(.trailing, safeAreaInsets.trailing)
+            .padding(.bottom, safeAreaInsets.bottom)
         }
 
         @ViewBuilder

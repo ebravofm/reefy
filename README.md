@@ -2,9 +2,9 @@
   <img alt="Swiftfin" src="./Resources/primary-wide.svg">
 
   <h1>Swiftfin</h1>
-  <img src="https://img.shields.io/badge/iOS-16+-red"/>
-  <img src="https://img.shields.io/badge/tvOS-17+-red"/>
-  <img src="https://img.shields.io/badge/Jellyfin-10.11-9962be"/>
+  <img src="https://img.shields.io/badge/iOS-18+-red"/>
+  <img src="https://img.shields.io/badge/tvOS-26+-red"/>
+  <img src="https://img.shields.io/badge/Jellyfin-12.0-9962be"/>
   
   <a href="https://translate.jellyfin.org/engage/swiftfin/">
     <img src="https://translate.jellyfin.org/widgets/swiftfin/-/svg-badge.svg"/>
@@ -31,9 +31,6 @@
 
 Use the TestFlight version to test new features and bug fixes before being published to the App Store. We are grateful for your time and resources for reporting new bugs.
 
-> [!NOTE]
-> Only iOS has a TestFlight version. See [this discussion](https://github.com/jellyfin/Swiftfin/discussions/1294) for tvOS updates.
-
 <a href="https://testflight.apple.com/join/SqNPfdxq">
   <img height=75 alt="Get the beta on TestFlight" src="./Resources/testflight.svg"/>
 </a>
@@ -43,8 +40,9 @@ Use the TestFlight version to test new features and bug fixes before being publi
 Swiftfin provides detailed documentation to help you understand key aspects of the app and its development approach:
 
 - [🎞️ Library Support](https://github.com/jellyfin/Swiftfin/blob/main/Documentation/libraries.md) — Information on **library compatibility** and supported media types in Swiftin.
-- [🎬 Media Playback](https://github.com/jellyfin/Swiftfin/blob/main/Documentation/players.md) — Learn about Swiftfin's **Native** and **Swiftfin** players and how their features vary.
+- [🎬 Media Playback](https://github.com/jellyfin/Swiftfin/blob/main/Documentation/players.md) — Learn about Swiftfin's **Native** and **VLC** players and how their features vary.
 - [🧩 OS Version Support](https://github.com/jellyfin/Swiftfin/blob/main/Documentation/version.md) — Read about how we determine the **minimum supported OS** and which versions of iOS & tvOS are supported.
+- [🐞 Common Issues](https://github.com/jellyfin/Swiftfin/blob/main/Documentation/common_issues.md) — If you are experiencing an issue with Swiftfin, this is the best place to start.
 - [💜 Supporting Development](https://jellyfin.org/docs/general/contributing/direct-donations) — Learn how you can **support the project developers** and help keep Swiftfin improving.
 
 ## ⚙️ Development

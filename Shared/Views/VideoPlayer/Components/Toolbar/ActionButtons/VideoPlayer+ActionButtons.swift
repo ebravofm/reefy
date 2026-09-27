@@ -46,11 +46,9 @@ extension VideoPlayer.PlaybackControls.Toolbar {
             }
 
             if manager.item.isLiveStream {
-                filteredButtons.removeAll { $0 == .audio }
                 filteredButtons.removeAll { $0 == .autoPlay }
                 filteredButtons.removeAll { $0 == .playbackSpeed }
                 filteredButtons.removeAll { $0 == .playbackSettings }
-                filteredButtons.removeAll { $0 == .subtitles }
             }
 
             return filteredButtons
@@ -62,6 +60,22 @@ extension VideoPlayer.PlaybackControls.Toolbar {
 
         private var menuActionButtons: [VideoPlayerActionButton] {
             resolvedActionButtons(rawMenuActionButtons)
+        }
+
+        private var menuSystemImage: String {
+            if UIDevice.isTV || UIDevice.supportsLiquidGlass {
+                "ellipsis"
+            } else {
+                "ellipsis.circle"
+            }
+        }
+
+        private var buttonSize: CGFloat {
+            VideoPlayer.PlaybackControls.Toolbar.buttonSize
+        }
+
+        private var menuLabel: some View {
+            Label(L10n.menu, systemImage: menuSystemImage)
         }
 
         @ViewBuilder
@@ -92,10 +106,7 @@ extension VideoPlayer.PlaybackControls.Toolbar {
 
         @ViewBuilder
         private var compactView: some View {
-            Menu(
-                L10n.menu,
-                systemImage: "ellipsis.circle"
-            ) {
+            Menu {
                 ForEach(
                     barActionButtons,
                     content: view(for:)
@@ -107,47 +118,53 @@ extension VideoPlayer.PlaybackControls.Toolbar {
                     menuActionButtons,
                     content: view(for:)
                 )
+            } label: {
+                menuLabel
             }
+            .frame(width: buttonSize, height: buttonSize)
             .withViewContext(.isInMenu)
         }
 
         @ViewBuilder
         private var regularView: some View {
-            HStack(spacing: UIDevice.isTV ? 16 : 0) {
+            HStack(spacing: VideoPlayer.PlaybackControls.Toolbar.buttonSpacing) {
                 ForEach(barActionButtons) { button in
                     view(for: button)
+                        .frame(width: buttonSize, height: buttonSize)
                         .focused($focusedButton, equals: button.rawValue)
                 }
 
                 if menuActionButtons.isNotEmpty {
-                    Menu(
-                        L10n.menu,
-                        systemImage: UIDevice.isTV ? "ellipsis" : "ellipsis.circle"
-                    ) {
+                    Menu {
                         ForEach(
                             menuActionButtons,
                             content: view(for:)
                         )
                         .withViewContext(.isInMenu)
+                    } label: {
+                        menuLabel
                     }
+                    .frame(width: buttonSize, height: buttonSize)
                     .focused($focusedButton, equals: "menu")
                 }
             }
-            .focusSection()
-            .backport
             .defaultFocus(
                 $focusedButton,
                 barActionButtons.first?.rawValue ?? "menu",
                 priority: .userInitiated
             )
+            .focusSection()
         }
 
         var body: some View {
-            if containerState.isCompact {
-                compactView
-            } else {
-                regularView
+            Group {
+                if containerState.isCompact {
+                    compactView
+                } else {
+                    regularView
+                }
             }
+            .modifier(VideoPlayer.PlaybackControls.OverlayBarButtonStyleModifier())
         }
     }
 }

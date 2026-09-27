@@ -6,7 +6,6 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import Defaults
 import JellyfinAPI
 import SwiftUI
 
@@ -38,7 +37,6 @@ struct ServerUserDeviceAccessView: View {
 
     var body: some View {
         contentView
-            .backport
             .toolbarTitleDisplayMode(.inline)
             .navigationTitle(L10n.deviceAccess.localizedCapitalized)
             .navigationBarCloseButton {
@@ -48,12 +46,22 @@ struct ServerUserDeviceAccessView: View {
                 if viewModel.background.is(.updating) {
                     ProgressView()
                 }
-                Button(L10n.save) {
+                let saveAction: () -> Void = {
                     if tempPolicy != viewModel.user.policy {
                         viewModel.updatePolicy(tempPolicy)
                     }
                 }
-                .buttonStyle(.toolbarPill)
+
+                Group {
+                    if #available(iOS 26, *) {
+                        Button(L10n.save, role: .confirm, action: saveAction)
+                    } else {
+                        Button(L10n.save, action: saveAction)
+                            .backport
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.small)
+                    }
+                }
                 .disabled(viewModel.user.policy == tempPolicy)
             }
             .onReceive(viewModel.events) { event in
@@ -75,11 +83,16 @@ struct ServerUserDeviceAccessView: View {
     @ViewBuilder
     private var contentView: some View {
         List {
-            InsetGroupedListHeader {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.secondarySystemBackground)
+
                 Toggle(
                     L10n.enableAllDevices,
                     isOn: $tempPolicy.enableAllDevices.coalesce(false)
                 )
+                .padding(.init(vertical: 5, horizontal: 20))
+                .listRowInsets(.init(vertical: 10, horizontal: 20))
             }
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)

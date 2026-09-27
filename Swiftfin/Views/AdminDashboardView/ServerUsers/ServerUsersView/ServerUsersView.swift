@@ -7,14 +7,10 @@
 //
 
 import CollectionVGrid
-import Defaults
 import JellyfinAPI
 import SwiftUI
 
 struct ServerUsersView: View {
-
-    @Default(.accentColor)
-    private var accentColor
 
     @Router
     private var router
@@ -45,18 +41,18 @@ struct ServerUsersView: View {
             switch viewModel.state {
             case .content:
                 userListView
-            case let .error(error):
-                ErrorView(error: error)
+            case .error:
+                ErrorView(error: viewModel.error ?? ErrorMessage(L10n.unknownError))
             case .initial:
                 ProgressView()
             }
         }
         .animation(.linear(duration: 0.2), value: viewModel.state)
         .navigationTitle(L10n.users)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isEditing)
         .refreshable {
-            viewModel.send(.getUsers(isHidden: isHiddenFilterActive, isDisabled: isDisabledFilterActive))
+            await viewModel.getUsers(isHidden: isHiddenFilterActive, isDisabled: isDisabledFilterActive)
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -66,7 +62,7 @@ struct ServerUsersView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 if isEditing {
-                    Button(isEditing ? L10n.cancel : L10n.edit) {
+                    Button(L10n.cancel, role: .cancel) {
                         isEditing.toggle()
 
                         UIDevice.impact(.light)
@@ -75,23 +71,32 @@ struct ServerUsersView: View {
                             selectedUsers.removeAll()
                         }
                     }
-                    .buttonStyle(.toolbarPill)
-                    .foregroundStyle(accentColor)
+                    .foregroundStyle(.primary, .secondary)
+                    .if(true) { view in
+                        if #available(iOS 26.0, *) {
+                            view
+                        } else {
+                            view
+                                .backport
+                                .buttonStyle(.glass)
+                        }
+                    }
+                    .controlSize(.small)
                 }
             }
             ToolbarItem(placement: .bottomBar) {
                 if isEditing {
-                    Button(L10n.delete) {
+                    Button(L10n.delete, role: .destructive) {
                         isPresentingDeleteSelectionConfirmation = true
                     }
-                    .buttonStyle(.toolbarPill(.red))
+                    .backport
+                    .buttonStyle(.glassProminent)
                     .disabled(selectedUsers.isEmpty)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
         }
         .navigationBarMenuButton(
-            isLoading: viewModel.backgroundStates.contains(.gettingUsers),
+            isLoading: viewModel.background.is(.gettingUsers),
             isHidden: isEditing
         ) {
             Button(L10n.addUser, systemImage: "plus") {
@@ -112,20 +117,20 @@ struct ServerUsersView: View {
             }
         }
 
-        .onChange(of: isDisabledFilterActive) { newValue in
-            viewModel.send(.getUsers(
+        .onChange(of: isDisabledFilterActive) {
+            viewModel.getUsers(
                 isHidden: isHiddenFilterActive,
-                isDisabled: newValue
-            ))
-        }
-        .onChange(of: isHiddenFilterActive) { newValue in
-            viewModel.send(.getUsers(
-                isHidden: newValue,
                 isDisabled: isDisabledFilterActive
-            ))
+            )
+        }
+        .onChange(of: isHiddenFilterActive) {
+            viewModel.getUsers(
+                isHidden: isHiddenFilterActive,
+                isDisabled: isDisabledFilterActive
+            )
         }
         .onFirstAppear {
-            viewModel.send(.getUsers())
+            viewModel.getUsers(isHidden: isHiddenFilterActive, isDisabled: isDisabledFilterActive)
         }
         .confirmationDialog(
             L10n.delete,
@@ -151,7 +156,7 @@ struct ServerUsersView: View {
             Text(L10n.deleteUserSelfDeletion(viewModel.userSession?.user.username ?? ""))
         }
         .onNotification(.didAddServerUser) { newUser in
-            viewModel.send(.appendUser(newUser))
+            viewModel.appendUser(newUser)
             router.route(to: .userDetails(user: newUser))
         }
     }
@@ -214,9 +219,18 @@ struct ServerUsersView: View {
                 selectedUsers = Set(viewModel.users.compactMap(\.id))
             }
         }
-        .buttonStyle(.toolbarPill)
-        .disabled(!isEditing)
-        .foregroundStyle(accentColor)
+        .foregroundStyle(.primary, .secondary)
+        .if(true) { view in
+            if #available(iOS 26.0, *) {
+                view
+            } else {
+                view
+                    .backport
+                    .buttonStyle(.glass)
+            }
+        }
+        .controlSize(.small)
+        .enabled(isEditing)
     }
 
     // MARK: - Delete Selected Users Confirmation Actions
@@ -226,7 +240,7 @@ struct ServerUsersView: View {
         Button(L10n.cancel, role: .cancel) {}
 
         Button(L10n.confirm, role: .destructive) {
-            viewModel.send(.deleteUsers(Array(selectedUsers)))
+            viewModel.deleteUsers(Array(selectedUsers))
             isEditing = false
             selectedUsers.removeAll()
         }
@@ -243,7 +257,7 @@ struct ServerUsersView: View {
                 if userToDelete == viewModel.userSession?.user.id {
                     isPresentingSelfDeleteError = true
                 } else {
-                    viewModel.send(.deleteUsers([userToDelete]))
+                    viewModel.deleteUsers([userToDelete])
                     selectedUsers.removeAll()
                 }
             }

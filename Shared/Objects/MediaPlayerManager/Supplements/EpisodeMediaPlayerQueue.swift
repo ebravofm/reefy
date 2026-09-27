@@ -54,7 +54,7 @@ class EpisodeMediaPlayerQueue: ViewModel, MediaPlayerQueue {
     init(episode: BaseItemDto) {
         self.seasonsViewModel = PagingLibraryViewModel(
             library: SeasonViewModelLibrary(
-                series: BaseItemDto(id: episode.seriesID, name: episode.seriesName)
+                parent: BaseItemDto(id: episode.seriesID, name: episode.seriesName)
             ),
             pageSize: 100
         )
@@ -87,7 +87,6 @@ class EpisodeMediaPlayerQueue: ViewModel, MediaPlayerQueue {
 
         let parameters = try Paths.GetEpisodesParameters(
             userID: authenticatedUser.id,
-            fields: .MinimumFields,
             adjacentTo: item.id!,
             limit: 3
         )
@@ -124,19 +123,21 @@ class EpisodeMediaPlayerQueue: ViewModel, MediaPlayerQueue {
         var previousProvider: MediaPlayerItemProvider?
 
         if let nextItem {
-            nextProvider = MediaPlayerItemProvider(item: nextItem) { [weak self] item in
+            nextProvider = MediaPlayerItemProvider(item: nextItem) { [weak self] item, modifyItem in
                 let bitrate = await self?.manager?.playbackBitrate ?? Defaults[.VideoPlayer.Playback.appMaximumBitrate]
-                return try await MediaPlayerItem.build(for: item, requestedBitrate: bitrate) {
-                    $0.userData?.playbackPositionTicks = .zero
+                return try await MediaPlayerItem.build(for: item, requestedBitrate: bitrate) { item in
+                    item.userData?.playbackPositionTicks = .zero
+                    modifyItem?(&item)
                 }
             }
         }
 
         if let previousItem {
-            previousProvider = MediaPlayerItemProvider(item: previousItem) { [weak self] item in
+            previousProvider = MediaPlayerItemProvider(item: previousItem) { [weak self] item, modifyItem in
                 let bitrate = await self?.manager?.playbackBitrate ?? Defaults[.VideoPlayer.Playback.appMaximumBitrate]
-                return try await MediaPlayerItem.build(for: item, requestedBitrate: bitrate) {
-                    $0.userData?.playbackPositionTicks = .zero
+                return try await MediaPlayerItem.build(for: item, requestedBitrate: bitrate) { item in
+                    item.userData?.playbackPositionTicks = .zero
+                    modifyItem?(&item)
                 }
             }
         }
@@ -173,13 +174,11 @@ extension EpisodeMediaPlayerQueue {
         }
 
         private func select(episode: BaseItemDto) {
-            let provider = MediaPlayerItemProvider(item: episode) { [manager] item in
-                let mediaSource = item.mediaSources?.first
-
-                return try await MediaPlayerItem.build(
+            let provider = MediaPlayerItemProvider(item: episode) { [manager] item, modifyItem in
+                try await MediaPlayerItem.build(
                     for: item,
-                    mediaSource: mediaSource!,
-                    requestedBitrate: manager.playbackBitrate
+                    requestedBitrate: manager.playbackBitrate,
+                    modifyItem: modifyItem
                 )
             }
 
@@ -254,6 +253,9 @@ extension EpisodeMediaPlayerQueue {
 
         private struct _Body: View {
 
+            @EnvironmentObject
+            private var manager: MediaPlayerManager
+
             @ObservedObject
             var selectionViewModel: PagingLibraryViewModel<EpisodeLibrary>
 
@@ -267,12 +269,15 @@ extension EpisodeMediaPlayerQueue {
                             uniqueElements: selectionViewModel.elements,
                             layout: .columns(
                                 1,
-                                insets: .edgeInsets
+                                insets: .edgeInsets,
+                                itemSpacing: EdgeInsets.itemSpacing,
+                                lineSpacing: EdgeInsets.itemSpacing
                             )
                         ) { item in
                             EpisodeRow(episode: item) {
                                 action(item)
                             }
+                            .environmentObject(manager)
                         }
                     }
                 case .initial, .refreshing:
@@ -313,6 +318,9 @@ extension EpisodeMediaPlayerQueue {
             private var safeAreaInsets: EdgeInsets
             #endif
 
+            @EnvironmentObject
+            private var manager: MediaPlayerManager
+
             @ObservedObject
             var selectionViewModel: PagingLibraryViewModel<EpisodeLibrary>
 
@@ -329,8 +337,13 @@ extension EpisodeMediaPlayerQueue {
                     EpisodeButton(episode: episode) {
                         action(episode)
                     }
+                    .environmentObject(manager)
                 }
+                .initialElement(id: manager.item.id)
+                .insets(horizontal: EdgeInsets.edgePadding)
+                .itemSpacing(EdgeInsets.itemSpacing)
                 .ignoresSafeArea(.container, edges: .horizontal)
+                .frame(maxHeight: .infinity)
                 .focusSection()
                 #else
                 CollectionHStack(
@@ -341,10 +354,12 @@ extension EpisodeMediaPlayerQueue {
                     EpisodeButton(episode: item) {
                         action(item)
                     }
+                    .environmentObject(manager)
                 }
+                .initialElement(id: manager.item.id)
                 .clipsToBounds(false)
                 .insets(horizontal: max(safeAreaInsets.leading, safeAreaInsets.trailing) + EdgeInsets.edgePadding)
-                .itemSpacing(EdgeInsets.edgePadding / 2)
+                .itemSpacing(EdgeInsets.itemSpacing)
                 .scrollBehavior(.continuousLeadingEdge)
                 #endif
             }
@@ -386,7 +401,8 @@ extension EpisodeMediaPlayerQueue {
         private var retryButton: some View {
             AlternateLayoutView {
                 Label(L10n.retry, systemImage: "arrow.clockwise")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                     .padding()
                     .edgePadding(.horizontal)
                     .frame(height: UIDevice.isTV ? 80 : 40)
@@ -394,19 +410,13 @@ extension EpisodeMediaPlayerQueue {
                 Button {
                     viewModel.refresh()
                 } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 7)
-                            .foregroundStyle(.white)
-
-                        Label(L10n.retry, systemImage: "arrow.clockwise")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.black)
-                            .padding()
-                            .edgePadding(.horizontal)
-                    }
+                    Label(L10n.retry, systemImage: "arrow.clockwise")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding()
+                        .edgePadding(.horizontal)
                 }
-                .buttonStyle(.card)
+                .buttonStyle(.supplementAction)
                 .focused($isRetryButtonFocused)
                 .frame(height: UIDevice.isTV ? 80 : 50)
             }
@@ -450,7 +460,7 @@ extension EpisodeMediaPlayerQueue {
                 Rectangle()
                     .fill(.complexSecondary)
 
-                ImageView(episode.imageSource(.primary, environment: ImageSourceOptions(maxWidth: 200)))
+                ImageView(episode.imageSource(.primary, itemID: episode.id, environment: ImageSourceOptions(maxWidth: 200)))
                     .failure {
                         SystemImageContentView(systemName: episode.systemImage)
                     }
@@ -466,7 +476,7 @@ extension EpisodeMediaPlayerQueue {
                 }
             }
             .posterStyle(.landscape)
-            .posterShadow()
+            .subtleShadow()
             .hoverEffect(.highlight)
         }
     }
@@ -493,7 +503,7 @@ extension EpisodeMediaPlayerQueue {
     private struct EpisodeRow: View {
 
         @EnvironmentObject
-        private var manager: MediaPlayerManager
+        var manager: MediaPlayerManager
 
         let episode: BaseItemDto
         let action: () -> Void
@@ -536,18 +546,12 @@ extension EpisodeMediaPlayerQueue {
 
         var body: some View {
             PosterButton(
-                item: episode._withLandscapeImages { environment in
-                    [
-                        episode.imageSource(
-                            .primary,
-                            environment: environment
-                        )
-                    ]
-                },
+                item: episode,
                 displayType: .landscape
             ) { _ in
                 action()
             }
+            .removingViewContext(.isThumb)
             .isSelected(manager.item.id == episode.id)
         }
     }

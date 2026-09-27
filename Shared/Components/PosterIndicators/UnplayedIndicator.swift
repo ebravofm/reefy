@@ -14,9 +14,25 @@ struct UnplayedIndicator: View {
     @Default(.accentColor)
     private var accentColor
 
+    let count: Int?
+
     var body: some View {
-        Q3RightTriangle()
-            .fill(accentColor)
+        if let count, count > 0 {
+            Quadrant(.topTrailing) {
+                QuadrantItem(color: accentColor) {
+                    Text(count.description)
+                        .font(.body)
+                        .fontWeight(.semibold)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(L10n.posterAccessibilityUnplayedCount(count.formatted()))
+        } else {
+            Q3RightTriangle()
+                .fill(accentColor)
+                .aspectRatio(1, contentMode: .fit)
+                .accessibilityLabel(L10n.unplayed)
+        }
     }
 }
 

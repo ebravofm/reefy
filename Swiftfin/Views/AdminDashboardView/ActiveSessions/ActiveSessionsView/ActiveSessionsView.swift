@@ -7,7 +7,6 @@
 //
 
 import CollectionVGrid
-import Defaults
 import JellyfinAPI
 import SwiftUI
 
@@ -86,19 +85,22 @@ struct ActiveSessionsView: View {
     @ViewBuilder
     private var contentView: some View {
         if viewModel.sessions.isEmpty {
-            ContentUnavailableView(L10n.noActivity.localizedCapitalized, systemImage: "waveform.path.ecg")
+            ContentUnavailableView(
+                L10n.noActivity.localizedCapitalized,
+                systemImage: "waveform.path.ecg"
+            )
         } else {
             CollectionVGrid(
-                uniqueElements: viewModel.sessions.keys,
-                id: \.self,
+                uniqueElements: viewModel.sessions.values,
                 layout: .columns(1, insets: .zero, itemSpacing: 0, lineSpacing: 0)
-            ) { id in
-                ActiveSessionRow(viewModel: viewModel.sessions[id]!) {
+            ) { session in
+                ActiveSessionRow(viewModel: session) {
                     router.route(
-                        to: .activeSessionDetails(viewModel: viewModel.sessions[id]!)
+                        to: .activeSessionDetails(viewModel: session)
                     )
                 }
             }
+            .ignoresSafeArea(edges: .vertical)
         }
     }
 
@@ -115,7 +117,6 @@ struct ActiveSessionsView: View {
                 ProgressView()
             }
         }
-        .backport
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle(L10n.sessions)
         .animation(.linear(duration: 0.2), value: viewModel.state)
@@ -130,7 +131,16 @@ struct ActiveSessionsView: View {
                 ProgressView()
             }
 
-            Menu(L10n.filters, systemImage: "line.3.horizontal.decrease.circle") {
+            let systemImage = if #available(iOS 26, *) {
+                "line.3.horizontal.decrease"
+            } else {
+                "line.3.horizontal.decrease.circle"
+            }
+
+            Menu(
+                L10n.filters,
+                systemImage: systemImage
+            ) {
                 activeWithinFilterButton
                 showInactiveSessionsButton
             }

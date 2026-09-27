@@ -6,12 +6,18 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
+import Defaults
 import FactoryKit
 import JellyfinAPI
 import SwiftUI
 
 // TODO: fix weird tvOS icon rendering
 struct MainTabView: View {
+
+    #if os(tvOS)
+    @Default(.Customization.tabBarPlacement)
+    private var tabBarPlacement
+    #endif
 
     @InjectedObject(\.userSessionManager)
     private var userSessionManager
@@ -59,48 +65,80 @@ struct MainTabView: View {
         }
     }
 
-    var body: some View {
+    @ViewBuilder
+    private func tabRoot(_ tab: TabCoordinator.TabData) -> some View {
+        NavigationInjectionView(coordinator: tab.coordinator) {
+            tab.item.content
+                #if os(iOS)
+                    .if(tabCoordinator.tabs.first?.item.id == tab.item.id) { view in
+                        view.topBarTrailing {
+                            FirstTabSettingsBarButton()
+                        }
+                    }
+                #endif
+        }
+        .environmentObject(tabCoordinator)
+        .environment(\.tabItemSelected, tab.publisher)
+    }
+
+    @ViewBuilder
+    private func tabView() -> some View {
         TabView(selection: $tabCoordinator.selectedTabID) {
             ForEach(tabCoordinator.tabs, id: \.item.id) { tab in
-                NavigationInjectionView(
-                    coordinator: tab.coordinator
+                Tab(
+                    value: tab.item.id,
+                    role: tab.item.id == TabItem.search.id ? .search : nil
                 ) {
-                    tab.item.content
-                    #if os(iOS)
-                        .if(tabCoordinator.tabs.first?.item.id == tab.item.id) { view in
-                            view.topBarTrailing {
-                                FirstTabSettingsBarButton()
-                            }
-                        }
+                    #if os(tvOS)
+                    GeometryReader { proxy in
+                        tabRoot(tab)
+                            .environment(\.tabSafeAreaInsets, proxy.safeAreaInsets)
+                    }
+                    #else
+                    tabRoot(tab)
                     #endif
-                }
-                .environmentObject(tabCoordinator)
-                .environment(\.tabItemSelected, tab.publisher)
-                .tabItem {
+                } label: {
                     Label(
                         tab.item.displayTitle,
                         systemImage: tab.item.systemImage
                     )
-                    #if os(tvOS)
-                    .labelStyle(.tabItem(title: tab.item.displayTitle))
-                    #else
-                    .labelStyle(tab.item.labelStyle)
-                    #endif
                     .symbolRenderingMode(.monochrome)
-                    .eraseToAnyView()
                 }
-                .tag(tab.item.id)
             }
         }
-        .backport
-        .onChange(of: userSessionManager.pendingDeepLink) {
-            routePendingDeepLink(userSessionManager.consumePendingDeepLink())
-        }
+    }
+
+    @ViewBuilder
+    private func tabContent() -> some View {
         #if os(tvOS)
-        .background(alignment: .top) {
-            FocusedPosterCinematicBackgroundView()
+        switch tabBarPlacement {
+        case .sidebar:
+            tabView()
+                .tabViewStyle(.sidebarAdaptable)
+        case .tabBar:
+            tabView()
+                .tabViewStyle(.tabBarOnly)
         }
+        #else
+        tabView()
         #endif
+    }
+
+    var body: some View {
+        tabContent()
+            .onChange(of: userSessionManager.pendingDeepLink) {
+                routePendingDeepLink(userSessionManager.consumePendingDeepLink())
+            }
+            .onReceive(userSessionManager.routePublisher) { route in
+                Task { @MainActor in
+                    await tabCoordinator.route(to: route)
+                }
+            }
+            #if os(tvOS)
+            .background(alignment: .top) {
+                FocusedPosterCinematicBackgroundView()
+            }
+            #endif
     }
 }
 

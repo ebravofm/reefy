@@ -38,7 +38,7 @@ struct ServerLogsView: View {
                         UIApplication.shared.open(url)
                     } label: {
                         VStack(alignment: .leading) {
-                            Text(log.name ?? L10n.unknown)
+                            Text(log.name)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
 
@@ -69,7 +69,6 @@ struct ServerLogsView: View {
                 }
             }
         }
-        .backport
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle(L10n.serverLogs.localizedCapitalized)
         .animation(.linear(duration: 0.2), value: viewModel.state)
@@ -79,12 +78,20 @@ struct ServerLogsView: View {
         .onFirstAppear {
             viewModel.refresh(filter: filter)
         }
-        .backport
         .onChange(of: filter) {
             viewModel.refresh(filter: filter)
         }
         .topBarTrailing {
-            Menu(L10n.filters, systemImage: "line.3.horizontal.decrease.circle") {
+            let systemImage = if #available(iOS 26, *) {
+                "line.3.horizontal.decrease"
+            } else {
+                "line.3.horizontal.decrease.circle"
+            }
+
+            Menu(
+                L10n.filters,
+                systemImage: systemImage
+            ) {
                 Picker(selection: $filter) {
                     Label(L10n.all, systemImage: "line.3.horizontal")
                         .tag(nil as ServerLogType?)

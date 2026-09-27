@@ -20,22 +20,41 @@ struct HourMinutePicker: View {
     let title: String
     let interval: Binding<TimeInterval>
 
+    var maximumHours: Int = 24
+    var noneStyle: NoneStyle?
+
+    private var content: String {
+        if interval.wrappedValue == 0, let noneStyle {
+            noneStyle.displayTitle
+        } else {
+            Duration.seconds(interval.wrappedValue).formatted(.hourMinuteAbbreviated)
+        }
+    }
+
     var body: some View {
         ChevronButton(
             title,
-            content: Text(Duration.seconds(interval.wrappedValue), format: .hourMinuteAbbreviated)
+            content: content
         ) {
             isPresented.toggle()
         }
         #if os(tvOS)
-        ._alert(title, isPresented: $isPresented) {
-            _HourMinutePickerView(interval: interval)
-        }
+        .sheet(isPresented: $isPresented) {
+                VStack(spacing: 8) {
+                    Text(title.localizedCapitalized)
+                        .font(.title3)
+                        .edgePadding(.bottom)
+
+                    _HourMinutePickerView(interval: interval, maximumHours: maximumHours)
+                        .frame(width: 500, height: 400)
+                }
+                .edgePadding()
+            }
         #endif
 
         #if !os(tvOS)
         if isPresented {
-            _HourMinutePickerView(interval: interval)
+            _HourMinutePickerView(interval: interval, maximumHours: maximumHours)
         }
         #endif
     }
@@ -45,18 +64,31 @@ struct HourMinutePicker: View {
 
 #if os(iOS)
 
-private struct _HourMinutePickerView: UIViewRepresentable {
+private struct _HourMinutePickerView: PlatformViewRepresentable {
 
     let interval: Binding<TimeInterval>
+    var maximumHours: Int = 24
 
-    func makeUIView(context: Context) -> some UIView {
-        let picker = UIDatePicker(frame: .zero)
+    func makeUIView(context: Context) -> UIView {
+        guard maximumHours > 24 else {
+            let picker = UIDatePicker(frame: .zero)
+            picker.translatesAutoresizingMaskIntoConstraints = false
+            picker.datePickerMode = .countDownTimer
+            picker.countDownDuration = interval.wrappedValue
+
+            context.coordinator.add(picker: picker)
+
+            return picker
+        }
+
+        let picker = UIPickerView(frame: .zero)
         picker.translatesAutoresizingMaskIntoConstraints = false
-        picker.datePickerMode = .countDownTimer
-        picker.countDownDuration = interval.wrappedValue
+        picker.dataSource = context.coordinator
+        picker.delegate = context.coordinator
 
-        context.coordinator.add(picker: picker)
-        context.coordinator.interval = interval
+        let minutes = Int(interval.wrappedValue / 60)
+        picker.selectRow(minutes / 60, inComponent: 0, animated: false)
+        picker.selectRow(minutes % 60, inComponent: 1, animated: false)
 
         return picker
     }
@@ -64,12 +96,21 @@ private struct _HourMinutePickerView: UIViewRepresentable {
     func updateUIView(_ uiView: UIViewType, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(
+            interval: interval,
+            maximumHours: maximumHours
+        )
     }
 
-    class Coordinator {
+    class Coordinator: NSObject, UIPickerViewDataSource, UIPickerViewDelegate {
 
-        var interval: Binding<TimeInterval>!
+        private let interval: Binding<TimeInterval>!
+        private let maximumHours: Int
+
+        init(interval: Binding<TimeInterval>!, maximumHours: Int) {
+            self.interval = interval
+            self.maximumHours = maximumHours
+        }
 
         func add(picker: UIDatePicker) {
             picker.addTarget(
@@ -85,18 +126,44 @@ private struct _HourMinutePickerView: UIViewRepresentable {
         func dateChanged(_ picker: UIDatePicker) {
             interval.wrappedValue = picker.countDownDuration
         }
+
+        func numberOfComponents(in pickerView: UIPickerView) -> Int {
+            2
+        }
+
+        func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+            if component == 0 {
+                maximumHours
+            } else {
+                60
+            }
+        }
+
+        func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+            if component == 0 {
+                "\(row) \(L10n.hours)"
+            } else {
+                "\(row) \(L10n.minutes)"
+            }
+        }
+
+        func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+            let hours = pickerView.selectedRow(inComponent: 0)
+            let minutes = pickerView.selectedRow(inComponent: 1)
+
+            interval.wrappedValue = TimeInterval(hours * 3600 + minutes * 60)
+        }
     }
 }
 
-#endif
-
 // MARK: - tvOS Picker
 
-#if os(tvOS)
+#elseif os(tvOS)
 
-private struct _HourMinutePickerView: UIViewRepresentable {
+private struct _HourMinutePickerView: PlatformViewRepresentable {
 
     let interval: Binding<TimeInterval>
+    var maximumHours: Int = 24
 
     func makeUIView(context: Context) -> some UIView {
         let picker = TVOSPickerView(
@@ -115,7 +182,10 @@ private struct _HourMinutePickerView: UIViewRepresentable {
     func updateUIView(_ uiView: UIViewType, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(previousInterval: interval.wrappedValue)
+        Coordinator(
+            previousInterval: interval.wrappedValue,
+            maximumHours: maximumHours
+        )
     }
 
     class Coordinator: TVOSPickerViewDelegate {
@@ -125,9 +195,11 @@ private struct _HourMinutePickerView: UIViewRepresentable {
         private var selectedMinute: TimeInterval = 0
 
         private let previousInterval: TimeInterval
+        private let maximumHours: Int
 
-        init(previousInterval: TimeInterval) {
+        init(previousInterval: TimeInterval, maximumHours: Int) {
             self.previousInterval = previousInterval
+            self.maximumHours = maximumHours
         }
 
         func add(picker: TVOSPickerView) {
@@ -140,7 +212,7 @@ private struct _HourMinutePickerView: UIViewRepresentable {
 
         func pickerView(_ pickerView: TVOSPickerView, numberOfRowsInComponent component: Int) -> Int {
             if component == 0 {
-                24
+                maximumHours
             } else {
                 60
             }

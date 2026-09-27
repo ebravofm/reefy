@@ -123,9 +123,8 @@ extension View {
         } message: { error in
             Text(error.localizedDescription)
         }
-        .backport
-        .onChange(of: error.wrappedValue != nil) { _, hasError in
-            guard hasError else { return }
+        .onChange(of: error.wrappedValue != nil) {
+            guard error.wrappedValue != nil else { return }
             UIDevice.feedback(.error)
         }
     }
@@ -204,7 +203,7 @@ extension View {
     func inverseMask(alignment: Alignment = .center, @ViewBuilder _ content: @escaping () -> some View) -> some View {
         mask(alignment: alignment) {
             content()
-                .foregroundColor(.black)
+                .foregroundStyle(.black)
                 .background(.white)
                 .compositingGroup()
                 .luminanceToAlpha()
@@ -346,13 +345,13 @@ extension View {
     }
 
     @ViewBuilder
-    func posterShadow() -> some View {
+    func subtleShadow() -> some View {
         shadow(radius: 4, y: 2)
     }
 
     /// Applies the aspect ratio, corner radius, and border for the given `PosterType`
     ///
-    /// Note: will not apply `posterShadow`
+    /// Note: will not apply `subtleShadow`
     @ViewBuilder
     func posterStyle(
         _ type: PosterDisplayType,
@@ -361,22 +360,22 @@ extension View {
         switch type {
         case .landscape:
             posterAspectRatio(type, contentMode: contentMode)
-            #if !os(tvOS)
-                .posterBorder()
-                .posterCornerRadius(type)
-            #endif
+                #if !os(tvOS)
+                    .posterBorder()
+                    .posterCornerRadius(type)
+                #endif
         case .portrait:
             posterAspectRatio(type, contentMode: contentMode)
-            #if !os(tvOS)
-                .posterBorder()
-                .posterCornerRadius(type)
-            #endif
+                #if !os(tvOS)
+                    .posterBorder()
+                    .posterCornerRadius(type)
+                #endif
         case .square:
             posterAspectRatio(type, contentMode: contentMode)
-            #if os(iOS)
-                .posterBorder()
-                .posterCornerRadius(type)
-            #endif
+                #if os(iOS)
+                    .posterBorder()
+                    .posterCornerRadius(type)
+                #endif
         }
     }
 

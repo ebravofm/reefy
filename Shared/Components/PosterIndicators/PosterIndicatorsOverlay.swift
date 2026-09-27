@@ -12,26 +12,22 @@ import SwiftUI
 
 struct PosterIndicatorsOverlay: View {
 
-    @Environment(\.enabledPosterIndicators)
-    private var environmentIndicators
+    @Default(.accentColor)
+    private var accentColor
+
+    @Environment(\.isSelected)
+    private var isSelected
+    @Environment(\.posterConfiguration)
+    private var posterConfiguration
+
+    @ViewContextContains(.isInResume)
+    private var isInResume
 
     let item: BaseItemDto
     let posterDisplayType: PosterDisplayType
 
-    private let overrideIndicators: PosterIndicator?
-
     private var indicators: PosterIndicator {
-        overrideIndicators ?? environmentIndicators
-    }
-
-    init(
-        item: BaseItemDto,
-        indicators: PosterIndicator? = nil,
-        posterDisplayType: PosterDisplayType
-    ) {
-        self.item = item
-        self.posterDisplayType = posterDisplayType
-        self.overrideIndicators = indicators
+        posterConfiguration.indicators
     }
 
     private var indicatorSize: CGFloat {
@@ -48,49 +44,79 @@ struct PosterIndicatorsOverlay: View {
 
     private var showsProgressIndicator: Bool {
         indicators.contains(.progress) &&
-            item.progressLabel != nil &&
-            item.userData?.isPlayed != true
+            item.progressLabel != nil
+    }
+
+    private var showsFavoriteIndicator: Bool {
+        indicators.contains(.favorited) && item.userData?.isFavorite == true
+    }
+
+    private var showsPlayedIndicator: Bool {
+        indicators.contains(.played) &&
+            item.canBePlayed &&
+            !item.isLiveStream &&
+            item.userData?.isPlayed == true &&
+            !isInResume &&
+            (item.userData?.playbackPositionTicks ?? 0) == 0
+    }
+
+    @ArrayBuilder<QuadrantItem>
+    private var bottomIndicators: [QuadrantItem] {
+        if item.isRecording {
+            QuadrantItem(color: .red) {
+                Text(Image(systemName: "record.circle"))
+                    .accessibilityLabel(L10n.recording)
+            }
+        }
+
+        if showsFavoriteIndicator {
+            QuadrantItem(color: .pink) {
+                Text(Image(systemName: "heart.fill"))
+                    .accessibilityLabel(L10n.favorited)
+            }
+        }
+
+        if showsPlayedIndicator {
+            QuadrantItem(color: accentColor) {
+                Text(Image(systemName: "checkmark"))
+                    .fontWeight(.bold)
+                    .accessibilityLabel(L10n.played)
+            }
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
                 if showsUnplayedIndicator {
-                    UnplayedIndicator()
-                        .frame(width: indicatorSize, height: indicatorSize)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    UnplayedIndicator(
+                        count: posterConfiguration.unplayedStyle == .count ? item.userData?.unplayedItemCount : nil
+                    )
+                    .frame(height: indicatorSize)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }
 
-                HStack(spacing: 5) {
-                    if indicators.contains(.favorited), item.userData?.isFavorite == true {
-                        FavoriteIndicator()
-                            .frame(width: indicatorSize, height: indicatorSize)
+                if !showsProgressIndicator {
+                    Quadrant(.bottomTrailing) {
+                        bottomIndicators
                     }
-
-                    if indicators.contains(.played),
-                       item.canBePlayed,
-                       !item.isLiveStream,
-                       item.userData?.isPlayed == true
-                    {
-                        PlayedIndicator()
-                            .frame(width: indicatorSize, height: indicatorSize)
-                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 }
-                .padding(3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .zIndex(10)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if showsProgressIndicator {
                 ProgressIndicator(
                     title: item.progressLabel ?? "",
-                    progress: (item.userData?.playedPercentage ?? 0) / 100,
+                    progress: item.progressPercentage ?? 0,
                     posterDisplayType: posterDisplayType
-                )
-                .zIndex(5)
+                ) {
+                    bottomIndicators
+                }
             }
         }
+        .opacity(isSelected ? 0.85 : 1)
+        .posterCornerRadius(posterDisplayType)
     }
 }
 
@@ -107,6 +133,7 @@ struct PosterSelectionOverlay: View {
             ContainerRelativeShape()
                 .stroke(accentColor, lineWidth: UIDevice.isTV ? 12 : 8)
                 .clipped()
+                .accessibilityHidden(true)
         }
     }
 }

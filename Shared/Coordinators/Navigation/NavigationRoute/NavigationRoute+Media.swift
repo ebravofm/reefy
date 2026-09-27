@@ -16,14 +16,11 @@ import Transmission
 extension NavigationRoute {
 
     @MainActor
-    static var channels: NavigationRoute {
+    static var liveGuide: NavigationRoute {
         NavigationRoute(
-            id: "channels"
+            id: "liveGuide"
         ) {
-            PagingLibraryView(library: ChannelLibrary())
-                .if(UIDevice.isTV) { view in
-                    view.toolbar(.hidden, for: .navigationBar)
-                }
+            EPGView()
         }
     }
 
@@ -54,25 +51,12 @@ extension NavigationRoute {
 
     @MainActor
     static func videoPlayer(
-        item: BaseItemDto,
-        mediaSource: MediaSourceInfo? = nil,
-        queue: (any MediaPlayerQueue)? = nil
-    ) -> NavigationRoute {
-        let provider = MediaPlayerItemProvider(item: item) { item in
-            try await MediaPlayerItem.build(for: item, mediaSource: mediaSource)
-        }
-        return Self.videoPlayer(provider: provider, queue: queue)
-    }
-
-    @MainActor
-    static func videoPlayer(
         provider: MediaPlayerItemProvider,
         queue: (any MediaPlayerQueue)? = nil
     ) -> NavigationRoute {
         let manager = MediaPlayerManager(
-            item: provider.item,
-            queue: queue,
-            mediaPlayerItemProvider: provider.function
+            provider: provider,
+            queue: queue
         )
 
         return Self.videoPlayer(manager: manager)
@@ -110,10 +94,11 @@ struct VideoPlayerViewShim: View {
 
     var body: some View {
         Group {
-            if Defaults[.VideoPlayer.videoPlayerType] == .swiftfin {
-                VideoPlayer()
-            } else {
+            switch Defaults[.VideoPlayer.videoPlayerType] {
+            case .native:
                 NativeVideoPlayer()
+            case .vlc, .mpv:
+                VideoPlayer()
             }
         }
         .colorScheme(.dark) // use over `preferredColorScheme(.dark)` to not have destination change
@@ -122,6 +107,11 @@ struct VideoPlayerViewShim: View {
         .ignoresSafeArea()
         .persistentSystemOverlays(.hidden)
         .toolbar(.hidden, for: .navigationBar)
+        .onSceneDidEnterBackground {
+            if Defaults[.VideoPlayer.Transition.pauseOnBackground] {
+                manager.setPlaybackRequestStatus(status: .paused)
+            }
+        }
         .onFrameChanged { _, safeArea in
             self.safeAreaInsets = safeArea.max(EdgeInsets.edgePadding)
         }

@@ -80,8 +80,7 @@ struct ServerConnectionView: View {
                         } label: {
                             HStack {
                                 Text(L10n.evaluate)
-
-                                Spacer()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
                                 if viewModel.isEvaluatingAutoSwitchConnection {
                                     ProgressView()
@@ -124,7 +123,9 @@ struct ServerConnectionView: View {
                     editMode = isEditing ? .inactive : .active
                 }
                 #if os(iOS)
-                .buttonStyle(.toolbarPill)
+                .backport
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
                 #endif
             }
         }

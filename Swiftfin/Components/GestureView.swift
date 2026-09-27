@@ -11,7 +11,7 @@ import Foundation
 import Logging
 import SwiftUI
 
-struct GestureView: UIViewRepresentable {
+struct GestureView: PlatformViewRepresentable {
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
@@ -56,7 +56,7 @@ struct GestureView: UIViewRepresentable {
                 target: self,
                 action: #selector(handleLongPress)
             )
-            recognizer.minimumPressDuration = 1.2
+            recognizer.minimumPressDuration = 0.5
             return recognizer
         }()
 

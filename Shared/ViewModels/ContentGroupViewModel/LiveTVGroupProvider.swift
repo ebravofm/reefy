@@ -6,15 +6,26 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
+import JellyfinAPI
+
 struct LiveTVGroupProvider: ContentGroupProvider {
 
     private enum LiveTVPill: Displayable, SystemImageable {
         case channels
+        case guide
+        case recordings
+        case schedule
 
         var displayTitle: String {
             switch self {
             case .channels:
                 L10n.channels
+            case .guide:
+                L10n.guide
+            case .recordings:
+                L10n.recordings
+            case .schedule:
+                L10n.schedule
             }
         }
 
@@ -22,6 +33,12 @@ struct LiveTVGroupProvider: ContentGroupProvider {
             switch self {
             case .channels:
                 "play.square.stack"
+            case .guide:
+                "tablecells"
+            case .recordings:
+                "record.circle"
+            case .schedule:
+                "calendar.badge.clock"
             }
         }
     }
@@ -34,11 +51,28 @@ struct LiveTVGroupProvider: ContentGroupProvider {
         PillGroup(
             displayTitle: "",
             id: "live-tv-channels",
-            elements: [LiveTVPill.channels]
+            elements: [LiveTVPill.channels, .guide, .recordings, .schedule]
         ) { router, pill in
             switch pill {
             case .channels:
-                router.route(to: .library(library: ChannelProgramLibrary()))
+                router.route(
+                    to: .library(
+                        library: ItemLibrary(
+                            parent: BaseItemDto(name: L10n.channels),
+                            filters: .init(itemTypes: [.liveTvChannel])
+                        )
+                    )
+                )
+            case .guide:
+                router.route(to: .liveGuide)
+            case .recordings:
+                router.route(
+                    to: .library(library: RecordingsLibrary())
+                )
+            case .schedule:
+                router.route(
+                    to: .library(library: ScheduledRecordingsLibrary())
+                )
             }
         }
 
@@ -64,5 +98,12 @@ struct LiveTVGroupProvider: ContentGroupProvider {
                     posterSize: .small
                 )
             }
+
+        PosterGroup(
+            id: "recordings",
+            library: RecordingsLibrary(),
+            posterDisplayType: .landscape,
+            posterSize: .small
+        )
     }
 }

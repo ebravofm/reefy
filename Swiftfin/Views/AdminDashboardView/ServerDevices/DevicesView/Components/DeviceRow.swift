@@ -61,7 +61,7 @@ extension DevicesView {
                 }
             }
             .posterStyle(.square)
-            .posterShadow()
+            .subtleShadow()
             .frame(width: 60, height: 60)
         }
 
@@ -95,8 +95,7 @@ extension DevicesView {
                 }
                 .font(.subheadline)
                 .foregroundStyle(labelForegroundStyle, .secondary)
-
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 ListRowCheckbox()
             }

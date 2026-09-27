@@ -6,7 +6,6 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import Defaults
 import JellyfinAPI
 import SwiftUI
 
@@ -40,7 +39,6 @@ struct ServerUserParentalRatingView: View {
 
             blockUnratedItemsView
         }
-        .backport
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle(L10n.parentalRatings.localizedCapitalized)
         .navigationBarCloseButton {
@@ -51,12 +49,22 @@ struct ServerUserParentalRatingView: View {
                 ProgressView()
             }
 
-            Button(L10n.save) {
+            let saveAction: () -> Void = {
                 if tempPolicy != viewModel.user.policy {
                     viewModel.updatePolicy(tempPolicy)
                 }
             }
-            .buttonStyle(.toolbarPill)
+
+            Group {
+                if #available(iOS 26, *) {
+                    Button(L10n.save, role: .confirm, action: saveAction)
+                } else {
+                    Button(L10n.save, action: saveAction)
+                        .backport
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.small)
+                }
+            }
             .disabled(viewModel.user.policy == tempPolicy)
         }
         .onFirstAppear {

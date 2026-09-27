@@ -6,7 +6,6 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import Engine
 import OrderedCollections
 import SwiftUI
 
@@ -51,7 +50,8 @@ struct AppPermissionsView: View {
                                         .foregroundStyle(.blue)
                                         .padding(4)
                                         .padding(.horizontal, 4)
-                                        .background(Color.gray.opacity(0.2), in: .capsule)
+                                        .backport
+                                        .glassEffect(in: .capsule)
                                 }
                             } label: {
                                 Text(title)
@@ -64,6 +64,7 @@ struct AppPermissionsView: View {
                         ) {
                             Button(L10n.ok, role: .cancel) {}
                         } message: {
+                            // swiftlint:disable:next nested_l10n
                             Text(L10n.permissionRequestError(title, errorMessage.wrappedValue ?? L10n.unknownError))
                         }
                     }

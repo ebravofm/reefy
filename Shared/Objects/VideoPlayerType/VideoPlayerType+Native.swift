@@ -68,23 +68,6 @@ extension VideoPlayerType {
 
         DirectPlayProfile(type: .video) {
             AudioCodec.aac
-            AudioCodec.ac3
-            AudioCodec.eac3
-            AudioCodec.mp3
-        } videoCodecs: {
-
-            VideoCodec.h264
-
-            if PlaybackCapabilities.supportsHEVC {
-                VideoCodec.hevc
-            }
-
-        } containers: {
-            MediaContainer.mpegts
-        }
-
-        DirectPlayProfile(type: .video) {
-            AudioCodec.aac
             AudioCodec.amr_nb
         } videoCodecs: {
             VideoCodec.h264
@@ -181,6 +164,12 @@ extension VideoPlayerType {
                     VideoRangeType.sdr
                     VideoRangeType.doviWithSDR
                 }
+                ProfileCondition(
+                    condition: .notEquals,
+                    isRequired: false,
+                    property: .isInterlaced,
+                    value: "true"
+                )
             }
         )
 
@@ -196,6 +185,20 @@ extension VideoPlayerType {
                 ) {
                     nativeHDRProfiles
                 }
+                ProfileCondition(
+                    condition: .equalsAny,
+                    isRequired: true,
+                    property: .videoCodecTag
+                ) {
+                    "hvc1"
+                    "dvh1"
+                }
+                ProfileCondition(
+                    condition: .lessThanEqual,
+                    isRequired: true,
+                    property: .videoFramerate,
+                    value: "60"
+                )
             }
         )
 
@@ -245,6 +248,7 @@ extension VideoPlayerType {
         if PlaybackCapabilities.supportsHDR10 || PlaybackCapabilities.supportsDolbyVision {
             VideoRangeType.doviWithHDR10
             VideoRangeType.doviWithHDR10Plus
+            VideoRangeType.doviWithEL
             VideoRangeType.doviWithELHDR10Plus
         }
 

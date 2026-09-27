@@ -24,6 +24,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>reefy</string>
+				<string>jellyfin</string>
 			</array>
 		</dict>
 	</array>
@@ -44,8 +45,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Reefy needs local network access to discover and connect to your Jellyfin media server.</string>
-	<key>UIDesignRequiresCompatibility</key>
-	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>NotoSansCJK-Regular.ttc</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

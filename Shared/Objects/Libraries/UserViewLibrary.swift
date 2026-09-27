@@ -194,18 +194,16 @@ private struct UserViewLibraryGridElement: View {
                         .opacity(0.75)
                         .overlay {
                             titleLabel
-                                .foregroundColor(.primary)
+                                .foregroundStyle(.primary)
                         }
                 }
                 .id(imageSources.hashValue)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .posterStyle(.landscape)
-                .backport
                 .matchedTransitionSource(id: "item", in: namespace)
         }
         .onFirstAppear(perform: setImageSources)
-        .backport
-        .onChange(of: useRandomImage) { _, _ in
+        .onChange(of: useRandomImage) {
             setImageSources()
         }
         .buttonStyle(.card)
@@ -270,11 +268,9 @@ private struct UserViewLibraryListElement: View {
         } action: {
             element.libraryDidSelectElement(router: router, in: namespace)
         }
-        .backport
         .matchedTransitionSource(id: "item", in: namespace)
         .onFirstAppear(perform: setImageSources)
-        .backport
-        .onChange(of: useRandomImage) { _, _ in
+        .onChange(of: useRandomImage) {
             setImageSources()
         }
     }
@@ -295,7 +291,7 @@ private struct UserViewLibraryListElement: View {
                 .id(imageSources.hashValue)
         }
         .posterStyle(.landscape)
-        .posterShadow()
+        .subtleShadow()
         .frame(width: userViewLibraryListImageWidth)
     }
 
@@ -310,15 +306,15 @@ private extension UserViewLibraryElement {
 
     @MainActor
     func libraryImageSources(useRandomImage: Bool) async -> [ImageSource] {
-        if useRandomImage {
-            return await (try? randomItemImageSources()) ?? []
-        }
-
         switch self {
         case .favorites:
-            return []
+            return await (try? randomItemImageSources()) ?? []
         case let .userView(item):
-            return [item.imageSource(.primary, environment: ImageSourceOptions(maxWidth: 500))]
+            if useRandomImage {
+                return await (try? randomItemImageSources()) ?? []
+            }
+
+            return [item.imageSource(.primary, itemID: item.id, environment: ImageSourceOptions(maxWidth: 500))].compactMap(\.self)
         }
     }
 
@@ -328,23 +324,24 @@ private extension UserViewLibraryElement {
             throw UserSessionError.missingCurrentSession
         }
 
-        if case let .userView(item) = self, item.collectionType == .livetv {
-            return []
-        }
-
         var parentID: String?
         var filters: [ItemTrait]?
+        var includeItemTypes: [BaseItemKind] = BaseItemKind.supportedCases
 
         switch self {
         case .favorites:
             filters = [.isFavorite]
         case let .userView(item):
-            parentID = item.id
+            if item.collectionType == .livetv {
+                includeItemTypes = [.tvProgram, .liveTvProgram]
+            } else {
+                parentID = item.id
+            }
         }
 
         var parameters = Paths.GetItemsParameters()
         parameters.filters = filters
-        parameters.includeItemTypes = BaseItemKind.supportedCases
+        parameters.includeItemTypes = includeItemTypes
         parameters.isRecursive = true
         parameters.limit = 3
         parameters.parentID = parentID

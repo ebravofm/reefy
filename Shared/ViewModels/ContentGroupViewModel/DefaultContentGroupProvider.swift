@@ -71,7 +71,7 @@ struct DefaultContentGroupProvider: ContentGroupProvider {
             #else
             PosterGroup(
                 library: ItemLibrary(
-                    parent: BaseItemDto(name: L10n.recentlyAdded),
+                    parent: BaseItemDto(name: L10n.recentlyAdded.localizedCapitalized),
                     filters: .init(
                         itemTypes: [.movie, .series],
                         sortBy: [.dateCreated],
@@ -81,6 +81,27 @@ struct DefaultContentGroupProvider: ContentGroupProvider {
             )
             #endif
         }
+
+        if Defaults[.Customization.Home.showRecentlyPlayed] {
+            PosterGroup(
+                library: ItemLibrary(
+                    parent: BaseItemDto(name: L10n.recentlyPlayed.localizedCapitalized),
+                    filters: .init(
+                        itemTypes: [.movie, .series],
+                        sortBy: [.datePlayed],
+                        sortOrder: [.descending],
+                        traits: [.isPlayed]
+                    )
+                )
+            )
+        }
+
+        PosterGroup(
+            id: "programs-recommended",
+            library: RecommendedProgramsLibrary(),
+            posterDisplayType: .landscape,
+            posterSize: .small
+        )
 
         userViews
             .map(LatestInLibrary.init)

@@ -10,6 +10,7 @@ import JellyfinAPI
 import SwiftUI
 
 // TODO: scroll if description too long
+// TODO: move currentProgram tracking to a MediaPlayerObserver
 
 struct MediaInfoSupplement: MediaPlayerSupplement {
 
@@ -32,15 +33,21 @@ extension MediaInfoSupplement {
         @Environment(\.safeAreaInsets)
         private var safeAreaInsets: EdgeInsets
 
-        @FocusState
-        private var isResetButtonFocused: Bool
-
         @EnvironmentObject
         private var containerState: VideoPlayerContainerState
         @EnvironmentObject
         private var manager: MediaPlayerManager
 
-        let item: BaseItemDto
+        @State
+        private var item: BaseItemDto
+
+        @StateObject
+        private var recordingViewModel: RecordingTimerViewModel
+
+        init(item: BaseItemDto) {
+            self._item = State(initialValue: item)
+            self._recordingViewModel = StateObject(wrappedValue: RecordingTimerViewModel(item: item))
+        }
 
         @ViewBuilder
         private var accessoryView: some View {
@@ -69,27 +76,71 @@ extension MediaInfoSupplement {
         }
 
         @ViewBuilder
+        private var recordButtons: some View {
+            VStack {
+                Button(role: recordingViewModel.recordingTimer != nil ? .destructive : nil) {
+                    recordingViewModel.toggleRecording()
+                } label: {
+                    Group {
+                        if let recordingTimer = recordingViewModel.recordingTimer {
+                            Label(
+                                recordingTimer.status == .inProgress ? L10n.stopRecording : L10n.cancelRecording,
+                                systemImage: "record.circle.fill"
+                            )
+                        } else {
+                            Label(L10n.record, systemImage: "record.circle")
+                        }
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                }
+                .buttonStyle(.supplementAction)
+                .frame(height: UIDevice.isTV ? 80 : 40)
+
+                if recordingViewModel.program?.isSeries == true {
+                    Button(role: recordingViewModel.seriesRecordingTimer != nil ? .destructive : nil) {
+                        recordingViewModel.toggleSeriesRecording()
+                    } label: {
+                        Group {
+                            if recordingViewModel.seriesRecordingTimer != nil {
+                                Label(L10n.cancelSeriesRecording, systemImage: "smallcircle.filled.circle.fill")
+                            } else {
+                                Label(L10n.recordSeries, systemImage: "smallcircle.filled.circle")
+                            }
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    }
+                    .buttonStyle(.supplementAction)
+                    .frame(height: UIDevice.isTV ? 80 : 40)
+                }
+            }
+            .enabled(recordingViewModel.canManageRecordings)
+            #if os(tvOS)
+            .focusSection()
+            #endif
+            .onAppear {
+                recordingViewModel.refresh()
+            }
+            .onReceive(Notifications[.recordingTimersDidChange].publisher) {
+                recordingViewModel.refresh()
+            }
+            .errorMessage($recordingViewModel.error)
+        }
+
+        @ViewBuilder
         private var fromBeginningButton: some View {
             Button {
                 manager.proxy?.setSeconds(.zero)
                 manager.setPlaybackRequestStatus(status: .playing)
                 containerState.select(supplement: nil)
             } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7)
-                        .foregroundStyle(.white)
-
-                    Label(L10n.fromBeginning, systemImage: "play.fill")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.black)
-                }
+                Label(L10n.fromBeginning, systemImage: "play.fill")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
             }
-            .buttonStyle(.card)
-            #if os(tvOS)
-                .focused($isResetButtonFocused)
-            #endif
-                .frame(height: UIDevice.isTV ? 80 : 40)
+            .buttonStyle(.supplementAction)
+            .frame(height: UIDevice.isTV ? 80 : 40)
         }
 
         // TODO: may need to be a layout for correct overview frame
@@ -105,6 +156,9 @@ extension MediaInfoSupplement {
             }
             .padding(.leading, safeAreaInsets.leading)
             .padding(.trailing, safeAreaInsets.trailing)
+            .task(id: item.currentProgram?.endDate) {
+                await updateCurrentProgram()
+            }
         }
 
         @ViewBuilder
@@ -115,7 +169,15 @@ extension MediaInfoSupplement {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                if let overview = item.overview {
+                if let currentProgram = item.currentProgram {
+                    Text(currentProgram.displayTitle)
+                        .fontWeight(.semibold)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let overview = item.overview ?? item.currentProgram?.overview {
                     Text(overview)
                         .font(.subheadline)
                         .fontWeight(.regular)
@@ -129,6 +191,10 @@ extension MediaInfoSupplement {
                     fromBeginningButton
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
+                        .padding(.vertical)
+                } else if item.canBeRecorded {
+                    recordButtons
+                        .frame(maxWidth: .infinity)
                         .padding(.vertical)
                 }
             }
@@ -147,15 +213,25 @@ extension MediaInfoSupplement {
                     contentMode: .fit
                 )
                 .posterCornerRadius(item.preferredPosterDisplayType)
-                .environment(\.isOverComplexContent, true)
+                .withViewContext(.isOverComplexContent)
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(item.displayTitle)
-                        .font(.callout.weight(.semibold))
+                        .font(.callout)
+                        .fontWeight(.semibold)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
-                    if let overview = item.overview {
+                    if let currentProgram = item.currentProgram {
+                        Text(currentProgram.displayTitle)
+                            .font(.callout)
+                            .fontWeight(.semibold)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let overview = item.overview ?? item.currentProgram?.overview {
                         Text(overview)
                             .font(.subheadline)
                             .fontWeight(.regular)
@@ -179,6 +255,8 @@ extension MediaInfoSupplement {
                     } content: {
                         fromBeginningButton
                     }
+                } else if item.canBeRecorded {
+                    recordButtons
                 }
             }
         }
@@ -195,12 +273,22 @@ extension MediaInfoSupplement {
                 .edgePadding()
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .focusSection()
-                .backport
-                .defaultFocus(
-                    $isResetButtonFocused,
-                    true,
-                    priority: .userInitiated
-                )
+                .task(id: item.currentProgram?.endDate) {
+                    await updateCurrentProgram()
+                }
+        }
+
+        private func updateCurrentProgram() async {
+            guard let userSession = manager.userSession,
+                  let endDate = item.currentProgram?.endDate
+            else { return }
+
+            try? await Task.sleep(for: .seconds(max(endDate.timeIntervalSinceNow + 1, 1)))
+
+            guard let newItem = try? await item.getFullItem(userSession: userSession) else { return }
+
+            item = newItem
+            await recordingViewModel.refresh()
         }
     }
 }

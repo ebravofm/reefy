@@ -28,6 +28,7 @@ extension L10n {
     // MARK: - Video codecs
 
     static let av1 = "AV1"
+    static let avc = "AVC"
     static let dirac = "Dirac"
     static let dv = "DV"
     static let ffv1 = "FFV1"
@@ -43,6 +44,7 @@ extension L10n {
     static let msMpeg4V1 = "MS MPEG-4 v1"
     static let msMpeg4V2 = "MS MPEG-4 v2"
     static let msMpeg4V3 = "MS MPEG-4 v3"
+    static let nal = "NAL"
     static let proRes = "ProRes"
     static let theora = "Theora"
     static let vc1 = "VC-1"
@@ -109,7 +111,6 @@ extension L10n {
     static let dvbTeletext = "DVB Teletext"
     static let dvdSubtitle = "DVD Subtitle"
     static let eia608 = "EIA-608"
-    static let jacosub = "Jacosub"
     static let mpeg4TimedText = "MPEG-4 Timed Text"
     static let mpl2 = "MPL2"
     static let pgsSubtitle = "PGS Subtitle"

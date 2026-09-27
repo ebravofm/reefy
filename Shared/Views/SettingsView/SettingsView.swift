@@ -21,32 +21,25 @@ struct SettingsView: View {
     @Default(.userAccentColor)
     private var accentColor
 
-    @Default(.VideoPlayer.videoPlayerType)
-    private var videoPlayerType
-
-    @Injected(\.userSessionManager)
+    @InjectedObject(\.userSessionManager)
     private var userSessionManager: UserSessionManager
 
     @Router
     private var router
-
-    @StateObject
-    private var viewModel = SettingsViewModel()
 
     // MARK: - Body
 
     var body: some View {
         Form(image: .reefyLogo) {
             serverSection
-            videoPlayerSection
             customizeSection
             diagnosticsSection
         }
         #if os(iOS)
         .navigationTitle(L10n.settings)
-        .navigationBarCloseButton {
-            router.dismiss()
-        }
+            .navigationBarCloseButton {
+                router.dismiss()
+            }
         #endif
     }
 
@@ -54,7 +47,7 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var serverSection: some View {
-        if let userSession = viewModel.userSession {
+        if let userSession = userSessionManager.currentSession {
             Section {
                 UserProfileRow(user: userSession.user.data) {
                     router.route(to: .localUserSettings(user: userSession.user.data))
@@ -87,45 +80,33 @@ struct SettingsView: View {
         }
 
         Section {
-            Button(L10n.switchUser) {
+            Button {
                 Task { @MainActor in
                     UIDevice.impact(.medium)
                     await userSessionManager.signOut(reason: .explicit)
                     router.dismiss()
                 }
+            } label: {
+                Text(L10n.switchUser)
+                    .frame(maxWidth: .infinity)
+                    // Otherwise non-Liquid Glass only uses text height
+                    .if(!UIDevice.supportsLiquidGlass) { button in
+                        button
+                            .frame(maxHeight: .infinity)
+                    }
             }
-            .buttonStyle(.primary)
-            .foregroundStyle(accentColor.overlayColor, accentColor)
-        }
-    }
-
-    // MARK: - Video Player Section
-
-    @ViewBuilder
-    private var videoPlayerSection: some View {
-        Section(L10n.videoPlayer) {
+            .listRowInsets(.zero)
+            .listRowBackground(Color.clear)
             #if os(iOS)
-            Picker(L10n.videoPlayerType, selection: $videoPlayerType)
-            #else
-            ListRowMenu(L10n.videoPlayerType, selection: $videoPlayerType)
+            .listRowSeparator(.hidden)
             #endif
-
-            ChevronButton(L10n.videoPlayer) {
-                router.route(to: .videoPlayerSettings)
-            }
-
-            ChevronButton(L10n.playbackQuality) {
-                router.route(to: .playbackQualitySettings)
-            }
-        } learnMore: {
-            LabeledContent(
-                L10n.swiftfin,
-                value: L10n.playerSwiftfinDescription
-            )
-            LabeledContent(
-                L10n.native,
-                value: L10n.playerNativeDescription
-            )
+            .fontWeight(.semibold)
+            .backport
+            .buttonStyle(.glassProminent.shadow(false))
+            .tint(accentColor)
+            #if os(iOS)
+            .controlSize(.large)
+            #endif
         }
     }
 

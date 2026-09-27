@@ -18,8 +18,8 @@ extension VideoPlayerType {
         switch self {
         case .native:
             Self._nativeCodecProfiles
-        case .swiftfin:
-            Self._swiftfinCodecProfiles
+        case .vlc, .mpv:
+            Self._vlcCodecProfiles
         }
     }
 
@@ -48,12 +48,6 @@ extension VideoPlayerType {
             isRequired: false,
             property: .videoLevel,
             value: "80"
-        )
-        ProfileCondition(
-            condition: .notEquals,
-            isRequired: false,
-            property: .isInterlaced,
-            value: "true"
         )
     }
 

@@ -6,6 +6,7 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
+import Defaults
 import FactoryKit
 import SwiftUI
 import Transmission
@@ -40,7 +41,12 @@ struct VideoPlayer: View {
     private var containerState: VideoPlayerContainerState = .init()
 
     init() {
-        self._proxy = .init(wrappedValue: VLCMediaPlayerProxy())
+        switch Defaults[.VideoPlayer.videoPlayerType] {
+        case .mpv:
+            self._proxy = .init(wrappedValue: MPVMediaPlayerProxy())
+        case .native, .vlc:
+            self._proxy = .init(wrappedValue: VLCMediaPlayerProxy())
+        }
     }
 
     var body: some View {
@@ -58,21 +64,18 @@ struct VideoPlayer: View {
             manager.start()
         }
         .prefersStatusBarHidden(!containerState.isPresentingOverlay)
-        .backport
-        .onChange(of: audioOffset) { _, newValue in
+        .onChange(of: audioOffset) {
             if let proxy = proxy as? MediaPlayerOffsetConfigurable {
-                proxy.setAudioOffset(newValue)
+                proxy.setAudioOffset(audioOffset)
             }
         }
-        .backport
-        .onChange(of: containerState.isAspectFilled) { _, newValue in
+        .onChange(of: containerState.isAspectFilled) {
             UIView.animate(withDuration: 0.2) {
-                proxy.setAspectFill(newValue)
+                proxy.setAspectFill(containerState.isAspectFilled)
             }
         }
-        .backport
-        .onChange(of: containerState.isScrubbing) { _, newValue in
-            if newValue {
+        .onChange(of: containerState.isScrubbing) {
+            if containerState.isScrubbing {
                 scrubbingStartTime = CACurrentMediaTime()
             }
 
@@ -86,19 +89,17 @@ struct VideoPlayer: View {
             manager.seconds = scrubbedSeconds
             proxy.setSeconds(scrubbedSeconds)
         }
-        .backport
-        .onChange(of: subtitleOffset) { _, newValue in
+        .onChange(of: subtitleOffset) {
             if let proxy = proxy as? MediaPlayerOffsetConfigurable {
-                proxy.setSubtitleOffset(newValue)
+                proxy.setSubtitleOffset(subtitleOffset)
             }
         }
         .preference(
             key: PresentationControllerShouldDismissPreferenceKey.self,
             value: containerState.presentationControllerShouldDismiss
         )
-        .backport
-        .onChange(of: presentationCoordinator.isPresented) { _, isPresented in
-            guard !isPresented else { return }
+        .onChange(of: presentationCoordinator.isPresented) {
+            guard !presentationCoordinator.isPresented else { return }
             isBeingDismissedByTransition = true
             manager.stop()
         }

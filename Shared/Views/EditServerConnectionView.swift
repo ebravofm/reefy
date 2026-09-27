@@ -136,7 +136,7 @@ struct EditServerConnectionView: View {
 
     private func save() async throws {
         guard !isNameEmpty else {
-            throw ErrorMessage(L10n.invalidX(L10n.name))
+            throw ErrorMessage(L10n.invalidName)
         }
 
         let connection = try draft.connection()
@@ -193,11 +193,11 @@ struct EditServerConnectionView: View {
 
             Section {
                 TextField(L10n.url, text: $draft.urlString)
-                #if !os(tvOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                    .autocorrectionDisabled()
-                #endif
+                    #if !os(tvOS)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        .autocorrectionDisabled()
+                    #endif
             } header: {
                 Text(L10n.url)
             } footer: {
@@ -282,13 +282,25 @@ struct EditServerConnectionView: View {
             router.dismiss()
         }
         .topBarTrailing {
-            Button(L10n.save) {
+            let saveAction: () -> Void = {
                 Task { try? await save() }
             }
+
+            Group {
+                #if os(iOS)
+                if #available(iOS 26, *) {
+                    Button(L10n.save, role: .confirm, action: saveAction)
+                } else {
+                    Button(L10n.save, action: saveAction)
+                        .backport
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.small)
+                }
+                #else
+                Button(L10n.save, action: saveAction)
+                #endif
+            }
             .disabled(isSaveDisabled)
-            #if os(iOS)
-                .buttonStyle(.toolbarPill)
-            #endif
         }
         .animation(.linear(duration: 0.1), value: draft.interface)
         .animation(.linear(duration: 0.1), value: draft.useWifiName)
@@ -296,14 +308,12 @@ struct EditServerConnectionView: View {
             isNameFocused = true
         }
         #if os(iOS)
-        .backport
-        .onChange(of: draft.interface) { _, newValue in
-            guard newValue == .wifi, draft.wifiSSIDs.first?.nilIfBlank == nil else { return }
+        .onChange(of: draft.interface) {
+            guard draft.interface == .wifi, draft.wifiSSIDs.first?.nilIfBlank == nil else { return }
             populateCurrentWifiSSID(keepSpecificOnFailure: false)
         }
-        .backport
-        .onChange(of: draft.useWifiName) { _, newValue in
-            guard newValue, draft.interface == .wifi, draft.wifiSSIDs.first?.nilIfBlank == nil else { return }
+        .onChange(of: draft.useWifiName) {
+            guard draft.useWifiName, draft.interface == .wifi, draft.wifiSSIDs.first?.nilIfBlank == nil else { return }
             populateCurrentWifiSSID(keepSpecificOnFailure: true)
         }
         .onAppear {
@@ -354,7 +364,7 @@ private struct ServerConnectionDraft: Equatable {
            useWifiName,
            normalizedSSIDs.isEmpty
         {
-            throw ErrorMessage(L10n.invalidX(L10n.wifiName))
+            throw ErrorMessage(L10n.invalidWifiName)
         }
 
         return ServerConnection(

@@ -11,17 +11,22 @@ import SwiftUI
 
 struct SearchView: View {
 
-    #if os(iOS)
     @Default(.Customization.Search.enabledDrawerFilters)
     private var enabledDrawerFilters
-    #endif
 
     @FocusState
     private var isSearchFocused: Bool
 
+    #if os(tvOS)
+    @FocusState
+    private var focusedFilter: FilterTrack.FocusTarget?
+    #endif
+
     @State
     private var searchQuery = ""
 
+    @StateObject
+    private var focusCoordinator: FocusCoordinator = .init()
     @StateObject
     private var viewModel = SearchViewModel()
 
@@ -37,47 +42,65 @@ struct SearchView: View {
                 }
                 #if os(tvOS)
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondary)
                 #endif
             }
         }
     }
 
-    @ViewBuilder
-    private var resultsView: some View {
-        ScrollView {
-            ContentGroupVStack(
-                groups: viewModel.itemContentGroupViewModel.groups
-            )
-        }
-        .scrollIndicators(.hidden)
-    }
-
     var body: some View {
-        ZStack {
-            switch viewModel.state {
-            case .error:
-                viewModel.error.map(ErrorView.init)
-            case .initial:
-                if viewModel.canSearch {
-                    if viewModel.isEmpty {
-                        Text(L10n.noResults)
-                    } else {
-                        resultsView
+        ScrollView {
+            VStack(spacing: 0) {
+                #if os(tvOS)
+                if enabledDrawerFilters.isNotEmpty {
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 20) {
+                            FilterTrack(viewModel: viewModel.filterViewModel, types: enabledDrawerFilters, focus: $focusedFilter)
+                        }
                     }
-                } else {
-                    suggestionsView
+                    .scrollClipDisabled()
+                    .scrollIndicators(.hidden)
+                    .frame(height: 64)
+                    .coordinatedFocusScope(
+                        $focusedFilter,
+                        values: enabledDrawerFilters.map(FilterTrack.FocusTarget.filter) +
+                            (viewModel.filterViewModel.hasActiveFilters ? [.reset] : [])
+                    )
+                    .edgePadding(.horizontal)
+                    .padding(.vertical, EdgeInsets.itemSpacing)
                 }
-            case .searching:
-                ProgressView()
+                #endif
+
+                ZStack {
+                    switch viewModel.state {
+                    case .error:
+                        viewModel.error.map(ErrorView.init)
+                    case .initial:
+                        if viewModel.canSearch {
+                            if viewModel.isEmpty {
+                                Text(L10n.noResults)
+                            } else {
+                                ContentGroupVStack(
+                                    groups: viewModel.itemContentGroupViewModel.groups
+                                )
+                            }
+                        } else {
+                            suggestionsView
+                        }
+                    case .searching:
+                        ProgressView()
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .focusSection()
             }
         }
+        .ignoresSafeArea(edges: .horizontal)
+        .scrollIndicators(.hidden)
         .animation(.linear(duration: 0.2), value: viewModel.state)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .ignoresSafeArea(.keyboard)
         .navigationTitle(L10n.search)
-        .backport
         .toolbarTitleDisplayMode(.inline)
-        .backport
         .searchFocused($isSearchFocused)
         .onReceive(tabItemSelected) { event in
             if event.isRepeat, event.isRoot {
@@ -87,14 +110,20 @@ struct SearchView: View {
         .onFirstAppear {
             viewModel.getSuggestions()
         }
-        .backport
-        .onChange(of: searchQuery) { _, newValue in
-            viewModel.search(query: newValue)
+        .onChange(of: searchQuery) {
+            viewModel.search(query: searchQuery)
         }
         .searchable(
             text: $searchQuery,
             prompt: L10n.search
         )
+        .environmentObject(focusCoordinator)
+        #if os(tvOS)
+        .modifier(SearchSafeAreaModifier())
+        .onReceive(viewModel.filterViewModel.$currentFilters) { filters in
+            searchQuery = filters.query ?? ""
+        }
+        #endif
         #if os(iOS)
         .navigationBarFilterDrawer(
             viewModel: viewModel.filterViewModel,

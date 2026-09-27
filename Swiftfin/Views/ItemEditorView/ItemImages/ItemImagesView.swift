@@ -8,7 +8,6 @@
 
 import CollectionHStack
 import Defaults
-import Engine
 import JellyfinAPI
 import SwiftUI
 
@@ -54,7 +53,6 @@ struct ItemImagesView: View {
                 }
             }
         }
-        .backport
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle(L10n.images)
         .navigationBarCloseButton {
@@ -141,7 +139,7 @@ struct ItemImagesView: View {
             .clipsToBounds(false)
             .scrollBehavior(.continuousLeadingEdge)
             .insets(horizontal: EdgeInsets.edgePadding)
-            .itemSpacing(EdgeInsets.edgePadding / 2)
+            .itemSpacing(EdgeInsets.itemSpacing)
             .id(selectedType)
             .transition(.opacity.animation(.linear(duration: 0.1)))
         } else {
@@ -152,7 +150,7 @@ struct ItemImagesView: View {
                 addImageButton
             }
             .insets(horizontal: EdgeInsets.edgePadding)
-            .itemSpacing(EdgeInsets.edgePadding / 2)
+            .itemSpacing(EdgeInsets.itemSpacing)
             .scrollDisabled(true)
             .id(selectedType)
             .transition(.opacity.animation(.linear(duration: 0.1)))
@@ -178,13 +176,9 @@ struct ItemImagesView: View {
                 selectedType.displayTitle,
                 systemImage: "chevron.down"
             )
-            .labelStyle(
-                CapsuleLabelStyle(
-                    isIconTrailing: true
-                )
-            )
-            .font(.headline)
+            .labelStyle(.trailingIcon)
         }
+        .buttonStyle(.capsule)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -229,7 +223,7 @@ struct ItemImagesView: View {
                     .pipeline(.Swiftfin.other)
                 }
                 .posterStyle(posterType)
-                .posterShadow()
+                .subtleShadow()
             }
             .buttonStyle(.plain)
         }
@@ -251,7 +245,7 @@ struct ItemImagesView: View {
                 }
             }
             .posterStyle(posterType)
-            .posterShadow()
+            .subtleShadow()
         }
         .buttonStyle(.plain)
     }

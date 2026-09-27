@@ -6,6 +6,7 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
+import Algorithms
 import FactoryKit
 import Foundation
 import Get
@@ -14,17 +15,26 @@ import SwiftUI
 
 extension BaseItemDto: Poster {
 
-    struct Environment: WithDefaultValue, WithImageSourceOptions, WithParentImageSourcePreference, WithViewContext {
+    struct Environment: WithDefaultValue, WithImageSourceOptions, WithViewContext {
 
         var maxWidth: CGFloat?
         var maxHeight: CGFloat?
         var quality: Int?
-        var useParent: Bool = true
+        var useParent: Bool = false
         var viewContext: ViewContext = .init()
 
         static var `default`: Self {
             .init()
         }
+    }
+
+    func resolveEnvironment(_ environment: EnvironmentValues) -> Environment {
+        let viewContext = environment.viewContext
+
+        return .init(
+            useParent: viewContext.contains(.isThumb) && environment.posterConfiguration.useSeriesLandscapeBackdrop,
+            viewContext: viewContext
+        )
     }
 
     var preferredPosterDisplayType: PosterDisplayType {
@@ -36,7 +46,7 @@ extension BaseItemDto: Poster {
         case .episode:
             seasonEpisodeLabel
         case .person:
-            people?.first?.firstRole
+            people?.first?.displayRole
         case .video:
             extraType?.displayTitle
         default:
@@ -52,7 +62,7 @@ extension BaseItemDto: Poster {
             "film.stack"
         case .channel, .tvChannel, .liveTvChannel, .program:
             "tv"
-        case .episode, .movie, .series, .video:
+        case .episode, .movie, .season, .series, .video:
             "film"
         case .collectionFolder, .folder, .userView:
             "folder.fill"
@@ -78,79 +88,102 @@ extension BaseItemDto: Poster {
     @ViewBuilder
     func posterOverlay(for displayType: PosterDisplayType) -> some View {
         ZStack {
-            PosterSelectionOverlay()
-
             PosterIndicatorsOverlay(
                 item: self,
                 posterDisplayType: displayType
             )
+
+            PosterSelectionOverlay()
         }
     }
 
-    @ImageSourceBuilder
-    func portraitImageSources(
+    func imageSources(
+        for displayType: PosterDisplayType,
         environment: Environment
     ) -> [ImageSource] {
-        switch type {
-        case .episode:
-            imageSource(itemID: seasonID, .primary, environment: environment)
-        case .boxSet, .channel, .liveTvChannel, .movie, .musicArtist, .person, .series, .tvChannel:
-            imageSource(.primary, environment: environment)
-        default:
-            []
-        }
-    }
+        @ImageSourceBuilder
+        var sources: [ImageSource] {
+            let isLandscape = displayType == .landscape
+            let preferThumb = isLandscape && environment.viewContext.contains(.isThumb)
+            let inheritLandscape = !isLandscape || type != .episode || environment.useParent
+            let isProgram = type == .program || type == .liveTvProgram || type == .tvProgram
 
-    @ImageSourceBuilder
-    func landscapeImageSources(
-        environment: Environment
-    ) -> [ImageSource] {
-        switch type {
-        case .episode:
-            if environment.useParent {
-                if environment.viewContext.contains(.isThumb) {
-                    imageSource(itemID: seriesID, .thumb, environment: environment)
+            if isLandscape, environment.viewContext.contains(.isBackdrop) {
+                if type == .episode {
+                    imageSource(.backdrop, itemID: parentBackdropItemID, tag: parentBackdropImageTags?.first, environment: environment)
                 }
-                imageSource(itemID: seriesID, .backdrop, environment: environment)
-                imageSource(.primary, environment: environment)
-            } else {
-                imageSource(.primary, environment: environment)
-            }
-        case .collectionFolder, .folder, .liveTvProgram, .musicVideo, .program, .userView, .video:
-            imageSource(.primary, environment: environment)
-        default:
-            if environment.viewContext.contains(.isThumb) {
-                imageSource(.thumb, environment: environment)
-            }
-            imageSource(.backdrop, environment: environment)
-        }
-    }
 
-    @ImageSourceBuilder
-    func squareImageSources(
-        environment: Environment
-    ) -> [ImageSource] {
-        switch type {
-        case .audio:
-            imageSource(.primary, environment: environment)
-            imageSource(
-                itemID: albumID,
-                .primary,
-                environment: environment
-            )
-        case .channel, .musicAlbum, .tvChannel:
-            imageSource(.primary, environment: environment)
-        case .program:
-            if let channelID {
-                imageSource(
-                    itemID: channelID,
-                    .primary,
-                    environment: environment
-                )
+                imageSource(.backdrop, itemID: id, environment: environment)
             }
-        default:
-            []
+
+            // Program squares represent the channel in the guide.
+            if displayType == .square, isProgram {
+                imageSource(.primary, itemID: channelID, tag: channelPrimaryImageTag, environment: environment)
+            }
+
+            if preferThumb {
+                imageSource(.thumb, itemID: id, environment: environment)
+
+                if inheritLandscape {
+                    imageSource(.thumb, itemID: seriesID, tag: seriesThumbImageTag, environment: environment)
+                    imageSource(.thumb, itemID: parentThumbItemID, tag: parentThumbImageTag, environment: environment)
+                }
+            }
+
+            if isLandscape {
+                let preferPrimary: Bool = if let primaryImageAspectRatio, primaryImageAspectRatio > 0 {
+                    primaryImageAspectRatio >= 1.33
+                } else {
+                    switch type {
+                    case .collectionFolder, .episode, .folder, .musicVideo, .userView, .video:
+                        true
+                    default:
+                        false
+                    }
+                }
+
+                if preferThumb || !preferPrimary {
+                    imageSource(.backdrop, itemID: id, environment: environment)
+                }
+
+                if type == .season || (type == .episode && environment.useParent) {
+                    imageSource(.backdrop, itemID: parentBackdropItemID, tag: parentBackdropImageTags?.first, environment: environment)
+                }
+            } else if type == .episode {
+                // A portrait episode card uses its season/series poster when available.
+                imageSource(.primary, itemID: parentPrimaryImageItemID, tag: parentPrimaryImageTag, environment: environment)
+                imageSource(.primary, itemID: seriesID, tag: seriesPrimaryImageTag, environment: environment)
+            }
+
+            imageSource(.primary, itemID: id, environment: environment)
+
+            // Never substitute a parent portrait for an episode's landscape still.
+            if type != .episode || !isLandscape {
+                imageSource(.primary, itemID: seriesID, tag: seriesPrimaryImageTag, environment: environment)
+                imageSource(.primary, itemID: parentPrimaryImageItemID, tag: parentPrimaryImageTag, environment: environment)
+            }
+
+            imageSource(.primary, itemID: albumID, tag: albumPrimaryImageTag, environment: environment)
+
+            if type == .season {
+                imageSource(.thumb, itemID: id, environment: environment)
+            }
+
+            imageSource(.backdrop, itemID: id, environment: environment)
+            imageSource(.thumb, itemID: id, environment: environment)
+
+            if inheritLandscape {
+                imageSource(.thumb, itemID: seriesID, tag: seriesThumbImageTag, environment: environment)
+                imageSource(.thumb, itemID: parentThumbItemID, tag: parentThumbImageTag, environment: environment)
+                imageSource(.backdrop, itemID: parentBackdropItemID, tag: parentBackdropImageTags?.first, environment: environment)
+            }
+
+            if isProgram {
+                imageSource(.primary, itemID: channelID, tag: channelPrimaryImageTag, environment: environment)
+            }
         }
+
+        return Array(sources.uniqued())
     }
 
     @ViewBuilder
@@ -296,89 +329,5 @@ private struct BaseItemDtoPosterContextMenu: View {
         item.userData = response.value
         Notifications[.itemUserDataDidChange].post(response.value)
         Notifications[.itemShouldRefreshMetadata].post(itemID)
-    }
-}
-
-private struct BaseItemDtoPosterLabel: View {
-
-    let item: BaseItemDto
-
-    var body: some View {
-        switch item.type {
-        case .program:
-            programLabel
-        case .episode:
-            episodeLabel
-        default:
-            titleSubtitleLabel
-        }
-    }
-
-    private var titleSubtitleLabel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(item.displayTitle)
-                .font(.footnote)
-                .foregroundColor(.primary)
-                .accessibilityLabel(item.displayTitle)
-                .lineLimit(1, reservesSpace: true)
-
-            Text(item.subtitle ?? " ")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
-                .lineLimit(1, reservesSpace: true)
-        }
-    }
-
-    private var episodeLabel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let seriesName = item.seriesName {
-                Text(seriesName)
-                    .font(.footnote.weight(.regular))
-                    .foregroundColor(.primary)
-                    .lineLimit(1, reservesSpace: true)
-            }
-
-            DotHStack {
-                Text(item.seasonEpisodeLabel ?? .emptyDash)
-
-                Text(item.displayTitle)
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .lineLimit(1)
-        }
-    }
-
-    private var programLabel: some View {
-        VStack(alignment: .leading) {
-            Text(item.channelName ?? .emptyDash)
-                .font(.footnote.weight(.semibold))
-                .foregroundColor(.primary)
-                .lineLimit(1, reservesSpace: true)
-
-            Text(item.displayTitle)
-                .font(.footnote.weight(.regular))
-                .foregroundColor(.primary)
-                .lineLimit(1, reservesSpace: true)
-
-            HStack(spacing: 2) {
-                if let startDate = item.startDate {
-                    Text(startDate, style: .time)
-                } else {
-                    Text(String.emptyDash)
-                }
-
-                Text(String.hyphen)
-
-                if let endDate = item.endDate {
-                    Text(endDate, style: .time)
-                } else {
-                    Text(String.emptyDash)
-                }
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
     }
 }

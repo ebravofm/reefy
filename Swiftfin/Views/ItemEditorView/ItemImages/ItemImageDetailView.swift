@@ -6,7 +6,6 @@
 // Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 //
 
-import Engine
 import JellyfinAPI
 import SwiftUI
 
@@ -94,7 +93,6 @@ struct ItemImageDetailView: View {
                 }
             }
         }
-        .backport
         .toolbarTitleDisplayMode(.inline)
         .navigationTitle(L10n.image)
         .navigationBarCloseButton {

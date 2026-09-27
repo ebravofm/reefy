@@ -11,7 +11,6 @@ import Defaults
 import FactoryKit
 import Foundation
 import JellyfinAPI
-import VLCUI
 
 // TODO: proper error catching
 // TODO: be a UserSessionService?
@@ -156,7 +155,7 @@ final class MediaPlayerManager: ViewModel {
 
     // TODO: replace with graph dependency package
     private func setSupplements() {
-        self.supplements = Defaults[.VideoPlayer.supplements].compactMap { kind -> (any MediaPlayerSupplement)? in
+        var newSupplements = Defaults[.VideoPlayer.supplements].compactMap { kind -> (any MediaPlayerSupplement)? in
             switch kind {
             case .info:
                 return MediaInfoSupplement(item: item)
@@ -166,13 +165,20 @@ final class MediaPlayerManager: ViewModel {
             case .queue:
                 return queue
             case .people:
-                guard let people = item.people?.filter({ $0.type?.isSupported == true }), people.isNotEmpty else { return nil }
+                guard let people = item.mergedPeople?.filter({ $0.type?.isSupported == true }),
+                      people.isNotEmpty else { return nil }
                 return MediaPeopleSupplement(people: people)
             case .playbackInformation:
                 guard let itemID = item.id else { return nil }
                 return PlaybackInformationSupplement(itemID: itemID)
             }
         }
+
+        if item.isLiveStream, Defaults[.Experimental.videoPlayerEPG] {
+            newSupplements.append(EPGSupplement())
+        }
+
+        self.supplements = newSupplements
     }
 
     /// The current seconds media playback is set to.
@@ -209,17 +215,13 @@ final class MediaPlayerManager: ViewModel {
 //    }
 
     init(
-        item: BaseItemDto,
-        queue: (any MediaPlayerQueue)? = nil,
-        mediaPlayerItemProvider: @escaping MediaPlayerItemProviderFunction
+        provider: MediaPlayerItemProvider,
+        queue: (any MediaPlayerQueue)? = nil
     ) {
-        self.item = item
+        self.item = provider.item
         self.queue = queue.map { AnyMediaPlayerQueue($0) }
         self.state = .loadingItem
-        self.initialMediaPlayerItemProvider = .init(
-            item: item,
-            function: mediaPlayerItemProvider
-        )
+        self.initialMediaPlayerItemProvider = provider
         super.init()
 
         self.queue?.manager = self
@@ -468,7 +470,7 @@ final class MediaPlayerManager: ViewModel {
             requestedBitrate: requestedBitrate ?? currentItem.requestedBitrate,
             modifyItem: { item in
                 if item.userData == nil {
-                    item.userData = UserItemDataDto()
+                    item.userData = UserItemDataDto(key: "")
                 }
                 item.userData?.playbackPositionTicks = currentSeconds.ticks
             }

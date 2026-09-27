@@ -115,6 +115,20 @@ extension Defaults.Keys {
             UserKey("mediaItemViewType", default: .enhanced)
         }
 
+        static var itemBarActionButtons: Key<[ItemActionButton]> {
+            UserKey(
+                "itemBarActionButtons",
+                default: ItemActionButton.defaultBarActionButtons
+            )
+        }
+
+        static var itemMenuActionButtons: Key<[ItemActionButton]> {
+            UserKey(
+                "itemMenuActionButtons",
+                default: ItemActionButton.defaultMenuActionButtons
+            )
+        }
+
         static var nextUpPosterType: Key<PosterDisplayType> {
             UserKey("nextUpPosterType", default: .portrait)
         }
@@ -125,6 +139,10 @@ extension Defaults.Keys {
 
         static var latestInLibraryPosterType: Key<PosterDisplayType> {
             UserKey("latestInLibraryPosterType", default: .portrait)
+        }
+
+        static var shouldShowRecommendations: Key<Bool> {
+            UserKey("shouldShowRecommendations", default: true)
         }
 
         static var shouldShowMissingSeasons: Key<Bool> {
@@ -144,17 +162,14 @@ extension Defaults.Keys {
             UserKey("searchPosterType", default: .portrait)
         }
 
-        enum Episodes {
-
-            static var useSeriesLandscapeBackdrop: Key<Bool> {
-                UserKey("useSeriesBackdrop", default: true)
-            }
+        static var tabBarPlacement: Key<TabBarPlacement> {
+            UserKey("tabBarPlacement", default: .sidebar)
         }
 
-        enum Indicators {
+        enum Poster {
 
-            static var enabled: Key<PosterIndicator> {
-                UserKey("enabledPosterIndicators", default: .all)
+            static var configuration: Key<PosterConfiguration> {
+                UserKey("posterConfiguration", default: .default)
             }
         }
 
@@ -218,6 +233,10 @@ extension Defaults.Keys {
                     default: 366 * 86400
                 )
             }
+
+            static var showRecentlyPlayed: Key<Bool> {
+                UserKey("showRecentlyPlayed", default: false)
+            }
         }
 
         enum Search {
@@ -279,7 +298,7 @@ extension Defaults.Keys {
         }
 
         static var videoPlayerType: Key<VideoPlayerType> {
-            UserKey("videoPlayerType", default: .swiftfin)
+            UserKey("videoPlayerType", default: .vlc)
         }
 
         enum Gesture {
@@ -337,6 +356,10 @@ extension Defaults.Keys {
         }
 
         enum Playback {
+            static var appMaximumResolution: Key<PlaybackResolution> {
+                UserKey("appMaximumResolution", default: .max)
+            }
+
             static var appMaximumBitrate: Key<PlaybackBitrate> {
                 UserKey("appMaximumBitrate", default: .auto)
             }
@@ -362,19 +385,10 @@ extension Defaults.Keys {
             }
         }
 
-        // TODO: transition into a SubtitleConfiguration instead of multiple types
         enum Subtitle {
 
-            static var subtitleColor: Key<Color> {
-                UserKey("subtitleColor", default: .white)
-            }
-
-            static var subtitleFontName: Key<String> {
-                UserKey("subtitleFontName", default: UIFont.systemFont(ofSize: 14).fontName)
-            }
-
-            static var subtitleSize: Key<Int> {
-                UserKey("subtitleSize", default: 9)
+            static var configuration: Key<SubtitleConfiguration> {
+                UserKey("subtitleConfiguration", default: .default)
             }
         }
 
@@ -388,12 +402,22 @@ extension Defaults.Keys {
     // Experimental settings
     enum Experimental {
 
+        static var mpvPlayer: Key<Bool> {
+            UserKey("experimentalMPVPlayer", default: false)
+        }
+
+        // TODO: don't use L10n key as key, just used to not
+        // lose translations
         static var downloads: Key<Bool> {
-            UserKey("experimentalDownloads", default: false)
+            UserKey(L10n.download, default: false)
         }
 
         static var serverConnectionAutoSwitch: Key<Bool> {
             UserKey("experimentalServerConnectionAutoSwitch", default: false)
+        }
+
+        static var videoPlayerEPG: Key<Bool> {
+            UserKey("experimentalVideoPlayerEPG", default: false)
         }
     }
 
@@ -419,11 +443,6 @@ extension Defaults.Keys {
         Key(name, default: `default`, suite: .appSuite)
     }
 
-    static let isLiquidGlassEnabled: Key<Bool> = DebugKey("experimentalLiquidGlass", default: false)
     static let sendProgressReports: Key<Bool> = DebugKey("sendProgressReports", default: true)
-}
-#else
-extension Defaults.Keys {
-    static let isLiquidGlassEnabled: Key<Bool> = AppKey("experimentalLiquidGlass", default: false)
 }
 #endif

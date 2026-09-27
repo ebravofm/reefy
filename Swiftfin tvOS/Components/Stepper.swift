@@ -64,14 +64,18 @@ struct Stepper<
         } label: {
             label()
         }
-        ._alert(title, isPresented: $isPresented) {
-            VStack {
+        .sheet(isPresented: $isPresented) {
+            VStack(spacing: 8) {
+                Text(title.localizedCapitalized)
+                    .font(.title3)
+                    .edgePadding(.bottom)
+
                 HStack(spacing: 24) {
                     Button(L10n.decrement, systemImage: "minus") {
                         value = min(range.upperBound, value.advanced(by: -step))
                     }
                     .buttonStyle(.bordered)
-                    .disabled(!canDecrement)
+                    .enabled(canDecrement)
 
                     Text(value, format: format)
                         .font(.headline)
@@ -94,7 +98,7 @@ struct Stepper<
                         value = min(range.upperBound, value.advanced(by: step))
                     }
                     .buttonStyle(.bordered)
-                    .disabled(!canIncrement)
+                    .enabled(canIncrement)
                 }
                 .labelStyle(.iconOnly)
                 .focusSection()
@@ -110,10 +114,12 @@ struct Stepper<
                         Text(L10n.close)
                     }
                 }
+                .edgePadding(.top)
             }
             .onAppear {
                 value = min(max(value, range.lowerBound), range.upperBound)
             }
+            .edgePadding()
         }
     }
 }

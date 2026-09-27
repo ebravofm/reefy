@@ -103,13 +103,13 @@ extension VideoPlayer.PlaybackControls {
         @ViewBuilder
         private func card(for episode: BaseItemDto, remaining: Int) -> some View {
             HStack(alignment: .center, spacing: 24) {
-                ImageView(episode.imageSource(.primary, environment: ImageSourceOptions(maxWidth: 400)))
+                ImageView(episode.imageSource(.primary, itemID: episode.id, environment: ImageSourceOptions(maxWidth: 400)))
                     .failure {
                         SystemImageContentView(systemName: episode.systemImage)
                     }
                     .posterStyle(.landscape)
                     .frame(width: 200)
-                    .posterShadow()
+                    .subtleShadow()
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L10n.nextUp)

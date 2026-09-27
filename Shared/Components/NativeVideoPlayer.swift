@@ -50,10 +50,9 @@ struct NativeVideoPlayer: View {
             manager.start()
         }
         .prefersStatusBarHidden()
-        .backport
-        .onChange(of: presentationCoordinator.isPresented) { _, isPresented in
+        .onChange(of: presentationCoordinator.isPresented) {
             Container.shared.mediaPlayerManager.reset()
-            guard !isPresented else { return }
+            guard !presentationCoordinator.isPresented else { return }
             manager.stop()
         }
         .alert(
@@ -75,7 +74,7 @@ struct NativeVideoPlayer: View {
 
 extension NativeVideoPlayer {
 
-    private struct NativeVideoPlayerView: UIViewControllerRepresentable {
+    private struct NativeVideoPlayerView: PlatformViewControllerRepresentable {
 
         let proxy: AVMediaPlayerProxy
 

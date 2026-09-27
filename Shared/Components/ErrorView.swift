@@ -52,15 +52,23 @@ struct ErrorView<ErrorType: Error>: View {
                 .multilineTextAlignment(.center)
 
             if let refresh {
-                Button(L10n.retry) {
+                Button {
                     Task {
                         await refresh()
                     }
+                } label: {
+                    Text(L10n.retry)
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.primary)
+                .fontWeight(.semibold)
+                .backport
+                .buttonStyle(.glassProminent.shadow(false))
+                .tint(accentColor)
+                #if os(iOS)
+                .controlSize(.large)
+                #endif
                 .frame(height: buttonHeight)
                 .frame(maxWidth: buttonMaxSize)
-                .foregroundStyle(accentColor.overlayColor, accentColor)
             }
 
             if let localizedError = error as? LocalizedError,

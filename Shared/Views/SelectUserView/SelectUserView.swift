@@ -139,6 +139,8 @@ struct SelectUserView: View {
                 let pin = (evaluatedPolicy as? PinEvaluatedUserAccessPolicy)?.pin ?? ""
 
                 await viewModel.signIn(user, pin: pin)
+            } catch is CancellationError {
+                return
             } catch {
                 await viewModel.error(error)
             }
@@ -244,7 +246,7 @@ struct SelectUserView: View {
                 .ignoresSafeArea(.all, edges: .horizontal)
             }
 
-            BottomBar(
+            Toolbar(
                 servers: viewModel.servers.keys,
                 allUsers: userItems,
                 isEditing: $isEditing,
@@ -272,7 +274,7 @@ struct SelectUserView: View {
         }
         .animation(.linear(duration: 0.1), value: viewModel.state)
         .animation(.linear(duration: 0.1), value: selectedServer)
-        .environment(\.isOverComplexContent, true)
+        .withViewContext(.isOverComplexContent)
         .isEditing(isEditing)
         .onFirstAppear {
             viewModel.getServers()
@@ -293,36 +295,60 @@ struct SelectUserView: View {
                             areAllUsersSelected ? L10n.removeAll : L10n.selectAll,
                             action: toggleAllUsersSelected
                         )
-                        .buttonStyle(.toolbarPill)
+                        .foregroundStyle(.primary, .secondary)
+                        .if(true) { view in
+                            if #available(iOS 26.0, *) {
+                                view
+                            } else {
+                                view
+                                    .backport
+                                    .buttonStyle(.glass)
+                            }
+                        }
+                        .controlSize(.small)
                     }
                 }
 
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if isEditing {
-                        Button(L10n.cancel) {
+                        Button(L10n.cancel, role: .cancel) {
                             isEditing = false
                         }
-                        .buttonStyle(.toolbarPill)
+                        .foregroundStyle(.primary, .secondary)
+                        .if(true) { view in
+                            if #available(iOS 26.0, *) {
+                                view
+                            } else {
+                                view
+                                    .backport
+                                    .buttonStyle(.glass)
+                            }
+                        }
+                        .controlSize(.small)
                     } else {
-                        Menu {
-                            AdvancedMenu(
+                        Menu(
+                            L10n.advanced,
+                            systemImage: "gearshape.fill"
+                        ) {
+                            AdvancedMenuContent(
                                 hasUsers: userItems.isNotEmpty,
                                 isEditing: $isEditing
                             )
-                        } label: {
-                            Label(L10n.advanced, systemImage: "gearshape.fill")
                         }
+                        .backport
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
                     }
                 }
 
                 ToolbarItem(placement: .bottomBar) {
                     if isEditing {
-                        Button(L10n.delete) {
+                        Button(L10n.delete, role: .destructive) {
                             isPresentingConfirmDeleteUsers = true
                         }
-                        .buttonStyle(.toolbarPill(.red))
+                        .backport
+                        .buttonStyle(.glassProminent)
                         .disabled(selectedUsers.isEmpty)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
             }
@@ -335,13 +361,12 @@ struct SelectUserView: View {
         #if os(iOS)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         #endif
-        .backport
         .onChange(of: isEditing) {
             guard !isEditing, !isPresentingConfirmDeleteUsers else { return }
             selectedUsers.removeAll()
         }
-        .backport
-        .onChange(of: viewModel.servers.keys) { _, newValue in
+        .onChange(of: viewModel.servers.keys) {
+            let newValue = viewModel.servers.keys
             if case let SelectUserServerSelection.server(id: id) = serverSelection,
                !newValue.contains(where: { $0.id == id })
             {

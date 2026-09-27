@@ -55,24 +55,46 @@ struct ConnectToServerView: View {
         }
 
         if viewModel.state == .connecting {
-            Button(L10n.cancel, role: .cancel) {
+            Button(role: .cancel) {
                 viewModel.cancel()
+            } label: {
+                Text(L10n.cancel)
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.primary)
+            .listRowInsets(.zero)
+            .listRowBackground(Color.clear)
+            #if os(iOS)
+            .listRowSeparator(.hidden)
+            #endif
+            .fontWeight(.semibold)
+            .backport
+            .buttonStyle(.glassProminent.shadow(false))
+            #if os(iOS)
+            .controlSize(.large)
+            #endif
             .frame(maxHeight: 75)
         } else {
-            Button(L10n.connect) {
+            Button {
                 isURLFocused = false
                 viewModel.connect(url: url)
+            } label: {
+                Text(L10n.connect)
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.primary)
+            .listRowInsets(.zero)
+            .listRowBackground(Color.clear)
+            #if os(iOS)
+            .listRowSeparator(.hidden)
+            #endif
+            .fontWeight(.semibold)
+            .backport
+            .buttonStyle(.glassProminent.shadow(false))
+            .tint(accentColor)
+            #if os(iOS)
+            .controlSize(.large)
+            #endif
             .frame(maxHeight: 75)
             .disabled(url.isEmpty)
-            .foregroundStyle(
-                accentColor.overlayColor,
-                accentColor
-            )
-            .opacity(url.isEmpty ? 0.5 : 1)
         }
     }
 
@@ -84,7 +106,7 @@ struct ConnectToServerView: View {
             if viewModel.localServers.isEmpty {
                 Text(L10n.noLocalServersFound)
                     .font(.callout)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
             } else {
                 ForEach(viewModel.localServers) { server in
@@ -105,7 +127,7 @@ struct ConnectToServerView: View {
 
             localServersSection
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbarTitleDisplayMode(.inline)
         .navigationBarCloseButton(disabled: viewModel.state == .connecting) {
             router.dismiss()
         }
@@ -145,30 +167,13 @@ struct ConnectToServerView: View {
                     ProgressView()
                 }
             }
-        #if os(tvOS)
-            ._alert(
-                L10n.connection,
-                isPresented: $duplicateServer.isNotNil()
-            ) {
-                if let server = duplicateServer {
-                    DuplicateServerConnectionView(server: server) {
-                        viewModel.addConnection(serverState: server)
-                        duplicateServer = nil
-                        router.dismiss()
-                    }
-                }
-            }
-        #else
             .sheet(item: $duplicateServer) { server in
-                NavigationStack {
-                    DuplicateServerConnectionView(server: server) {
-                        viewModel.addConnection(serverState: server)
-                        duplicateServer = nil
-                        router.dismiss()
-                    }
+                DuplicateServerConnectionView(server: server) {
+                    viewModel.addConnection(serverState: server)
+                    duplicateServer = nil
+                    router.dismiss()
                 }
             }
-        #endif
             .errorMessage($viewModel.error)
     }
 }

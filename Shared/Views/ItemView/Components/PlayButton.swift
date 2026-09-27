@@ -17,119 +17,42 @@ struct PlayButton: View {
     private var accentColor
 
     @ObservedObject
-    private var provider: ItemContentGroupProvider
+    var provider: ItemContentGroupProvider
 
     @Router
     private var router
 
-    #if os(tvOS)
-    private let playButtonFocus: FocusState<Bool>.Binding
-
-    init(
-        provider: ItemContentGroupProvider,
-        playButtonFocus: FocusState<Bool>.Binding
-    ) {
-        self.provider = provider
-        self.playButtonFocus = playButtonFocus
-    }
-    #else
-    init(provider: ItemContentGroupProvider) {
-        self.provider = provider
-    }
-    #endif
-
     private var mediaSource: String? {
-        guard provider.item.mediaSources?.count ?? 0 > 1 else { return nil }
-        return provider.selectedMediaSource?.displayTitle
+        guard provider.mediaPlayerItemProvider?.item.mediaSources?.count ?? 0 > 1 else { return nil }
+        return provider.mediaPlayerItemProvider?.mediaSource?.displayTitle
     }
 
     private func play(fromBeginning: Bool = false) {
-        guard let playButtonItem = provider.playButtonItem,
-              let selectedMediaSource = provider.selectedMediaSource
-        else {
-            provider.logger.error("Play selected with no item or media source")
+        let mediaPlayerItemProvider = if fromBeginning {
+            provider.mediaPlayerItemProvider?.modifyingItem {
+                $0.userData?.playbackPositionTicks = 0
+            }
+        } else {
+            provider.mediaPlayerItemProvider
+        }
+
+        guard let mediaPlayerItemProvider else {
+            provider.logger.error("Play selected with no playback item provider")
             return
         }
 
-        let queue: (any MediaPlayerQueue)? = {
-            if playButtonItem.type == .episode {
-                return EpisodeMediaPlayerQueue(episode: playButtonItem)
-            }
-            return nil
-        }()
-
-        let provider = MediaPlayerItemProvider(item: playButtonItem) { item in
-            try await MediaPlayerItem.build(
-                for: item,
-                mediaSource: selectedMediaSource
-            ) {
-                if fromBeginning {
-                    $0.userData?.playbackPositionTicks = 0
-                }
-            }
-        }
+        let queue: (any MediaPlayerQueue)? = mediaPlayerItemProvider.item.type == .episode ?
+            EpisodeMediaPlayerQueue(episode: mediaPlayerItemProvider.item) : nil
 
         router.route(
             to: .videoPlayer(
-                provider: provider,
+                provider: mediaPlayerItemProvider,
                 queue: queue
             )
         )
     }
 
-    @ViewBuilder
-    private var versionMenu: some View {
-        if let mediaSources = provider.playButtonItem?.mediaSources,
-           mediaSources.count > 1
-        {
-            Menu {
-                Picker(
-                    L10n.version,
-                    sources: mediaSources,
-                    selection: $provider.selectedMediaSource,
-                    noneStyle: nil
-                )
-            } label: {
-                #if os(tvOS)
-                let shape: Rectangle = .rect
-                #else
-                let shape: RoundedRectangle = .rect(cornerRadius: 10, style: .circular)
-                #endif
-
-                Label {
-                    Text(L10n.version)
-                } icon: {
-                    Image(systemName: "ellipsis")
-                    #if os(tvOS)
-                        .rotationEffect(.degrees(90))
-                    #endif
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .backport
-                .glassEffect(
-                    .regular.selection(
-                        tint: .clear,
-                        foregroundColor: .primary
-                    ),
-                    in: shape
-                )
-            }
-            .foregroundStyle(.primary, .secondary)
-            .font(.title3)
-            .fontWeight(.semibold)
-            .menuStyle(.button)
-            .labelStyle(.iconOnly)
-            .buttonStyle(BasicHoverButtonStyle())
-            #if !os(tvOS)
-                .aspectRatio(1, contentMode: .fit)
-            #else
-                .frame(width: 60)
-            #endif
-        }
-    }
-
-    @ViewBuilder
-    private var playButton: some View {
+    var body: some View {
         Button {
             play()
         } label: {
@@ -137,7 +60,7 @@ struct PlayButton: View {
                 Image(systemName: "play.fill")
 
                 VStack(spacing: 2) {
-                    Text(provider.playButtonItem?.playButtonLabel ?? L10n.play)
+                    Text(provider.mediaPlayerItemProvider?.item.playButtonLabel ?? L10n.play)
 
                     if let mediaSource {
                         Marquee(mediaSource, speed: 40, delay: 3, fade: 5)
@@ -148,41 +71,25 @@ struct PlayButton: View {
             }
             .font(.callout)
             .fontWeight(.semibold)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .backport
+            .glassEffect(
+                .regular.selection(
+                    tint: accentColor,
+                    foregroundColor: accentColor.overlayColor
+                ),
+                in: .capsule
+            )
         }
-        .foregroundStyle(accentColor.overlayColor, accentColor)
-        .buttonStyle(.primary)
-        #if os(tvOS)
-            .focused(playButtonFocus)
-        #endif
-            .contextMenu {
-                if provider.playButtonItem?.userData?.playbackPositionTicks != 0 {
-                    Button(L10n.playFromBeginning, systemImage: "gobackward") {
-                        play(fromBeginning: true)
-                    }
+        .buttonBorderShape(.capsule)
+        .buttonStyle(BasicHoverButtonStyle())
+        .contextMenu {
+            if provider.mediaPlayerItemProvider?.item.userData?.playbackPositionTicks != 0 {
+                Button(L10n.playFromBeginning, systemImage: "gobackward") {
+                    play(fromBeginning: true)
                 }
             }
-            .isSelected(true)
-            .disabled(provider.selectedMediaSource == nil)
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: UIDevice.isTV ? 30 : 10) {
-            playButton
-
-            versionMenu
         }
-        .frame(height: UIDevice.isTV ? 100 : 44)
+        .disabled(provider.mediaPlayerItemProvider == nil)
     }
 }
-
-#if os(tvOS)
-struct BasicHoverButtonStyle: ButtonStyle {
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .hoverEffect(.lift)
-    }
-}
-#else
-typealias BasicHoverButtonStyle = BorderlessButtonStyle
-#endif

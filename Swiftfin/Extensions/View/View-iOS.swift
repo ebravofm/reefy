@@ -18,25 +18,17 @@ extension View {
         self
     }
 
-    func navigationBarDrawer(@ViewBuilder _ drawer: @escaping () -> some View) -> some View {
-        modifier(NavigationBarDrawerModifier(drawer: drawer))
-    }
-
     @ViewBuilder
     func navigationBarFilterDrawer(
         viewModel: FilterViewModel,
         types: [ItemFilterType]
     ) -> some View {
-        if types.isEmpty {
-            self
-        } else {
-            navigationBarDrawer {
-                NavigationBarFilterDrawer(
-                    viewModel: viewModel,
-                    types: types
-                )
-            }
-        }
+        modifier(
+            NavigationBarFilterDrawerModifier(
+                viewModel: viewModel,
+                types: types
+            )
+        )
     }
 
     @ViewBuilder
@@ -70,7 +62,7 @@ extension View {
 
     @ViewBuilder
     func listRowCornerRadius(_ radius: CGFloat) -> some View {
-        introspect(.listCell, on: .iOS(.v16...)) { cell in
+        introspect(.listCell, on: .iOS(.v18...)) { cell in
             if #available(iOS 26, *) {
                 cell.cornerConfiguration = .uniformCorners(radius: .fixed(radius))
             } else {

@@ -39,12 +39,11 @@ struct PosterButton<Item: Poster>: View {
     @ViewBuilder
     private var contextMenuPreview: some View {
         buttonLabel()
+            .posterAccessibility(for: item)
             .frame(width: posterSize.width)
             .padding(20)
-            .background {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.secondarySystemFill)
-            }
+            .backport
+            .glassEffect(in: .rect(cornerRadius: 10))
     }
 
     @ViewBuilder
@@ -57,9 +56,8 @@ struct PosterButton<Item: Poster>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay { overlay.posterStyle(displayType) }
         .contentShape(.contextMenuPreview, Rectangle())
-        .backport
         .matchedTransitionSource(id: "item", in: namespace)
-        .posterShadow()
+        .subtleShadow()
         .hoverEffect(.highlight)
     }
 
@@ -80,23 +78,31 @@ struct PosterButton<Item: Poster>: View {
             // Layout required for tvOS focused offset label behavior
             #if os(tvOS)
             posterImage(overlay: item.posterOverlay(for: displayType))
+                .posterAspectRatio(displayType, contentMode: .fit)
+                .frame(width: posterSize.width > 0 ? posterSize.width : nil)
+                .posterAccessibility(for: item)
 
             item.posterLabel
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityHidden(true)
             #else
             buttonLabel(overlay: item.posterOverlay(for: displayType))
-                .trackingSize($posterSize)
+                .posterAccessibility(for: item)
             #endif
         }
+        .environment(\.posterDisplayType, displayType)
         .foregroundStyle(.primary, .secondary)
         .buttonStyle(.borderless)
         .buttonBorderShape(.roundedRectangle)
         #if os(tvOS)
-            .focusedValue(\.focusedPoster, AnyPoster(item))
+        .focusedValue(\.focusedPoster, AnyPoster(item))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ignoresSafeArea()
         #endif
-            .posterContextMenu(for: item) {
-                contextMenuPreview
-                    .withViewContext(viewContext)
-            }
+        .trackingSize($posterSize)
+        .posterContextMenu(for: item) {
+            contextMenuPreview
+                .withViewContext(viewContext)
+        }
     }
 }

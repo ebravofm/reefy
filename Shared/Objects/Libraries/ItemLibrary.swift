@@ -30,24 +30,26 @@ struct ItemLibrary: PagingLibrary, SearchablePagingLibrary, WithRandomElementLib
 
     init(
         parent: BaseItemDto,
-        filters: ItemFilterCollection? = nil
+        filters: ItemFilterCollection? = nil,
+        staticFilters: ItemFilterCollection = .default
     ) {
-        var environment = Environment(
-            grouping: parent.groupings?.defaultSelection,
-            filters: filters ?? .default
-        )
+        var filters = filters ?? .default
 
         if let id = parent.id, Defaults[.Customization.Library.rememberSort] {
             let storedFilters = StoredValues[.User.libraryFilters(parentID: id)]
 
-            environment.filters.sortBy = storedFilters.sortBy
-            environment.filters.sortOrder = storedFilters.sortOrder
+            filters.sortBy = storedFilters.sortBy
+            filters.sortOrder = storedFilters.sortOrder
         }
 
-        self.environment = environment
+        self.environment = .init(
+            grouping: parent.groupings?.defaultSelection,
+            filters: staticFilters.union(filters)
+        )
         self.filterViewModel = .init(
             parent: parent,
-            currentFilters: environment.filters
+            currentFilters: filters,
+            staticFilters: staticFilters
         )
         self.parent = parent
     }
@@ -143,12 +145,11 @@ struct ItemLibrary: PagingLibrary, SearchablePagingLibrary, WithRandomElementLib
         var parameters = attachPage(
             to: attachFilters(
                 to: makeBaseItemParameters(environment: environment),
-                using: environment.filters,
-                isLetterFilterIncluded: false
+                using: environment.filters
             ),
             pageState: pageState
         )
-        parameters.searchTerm = query
+        parameters.searchTerm = filterViewModel.staticFilters.query ?? query
         parameters.userID = pageState.userSession.user.id
 
         let request = Paths.getItems(parameters: parameters)
@@ -160,7 +161,7 @@ struct ItemLibrary: PagingLibrary, SearchablePagingLibrary, WithRandomElementLib
     private func makeBaseItemParameters(environment: Environment) -> Paths.GetItemsParameters {
         var parameters = Paths.GetItemsParameters()
         parameters.enableUserData = true
-        parameters.fields = .MinimumFields
+        parameters.fields = PosterSubtitleField.itemFields
         parameters.includeItemTypes = parent.supportedItemTypes(for: environment.grouping)
         parameters.isRecursive = parent.isRecursiveCollection(for: environment.grouping)
         parameters.sortBy = [.name]
@@ -169,8 +170,6 @@ struct ItemLibrary: PagingLibrary, SearchablePagingLibrary, WithRandomElementLib
         guard let parentID = parent.id else { return parameters }
 
         switch parent.libraryType {
-        case .boxSet, .collectionFolder, .userView:
-            parameters.parentID = parentID
         case .folder:
             parameters.parentID = parentID
             parameters.isRecursive = nil
@@ -179,7 +178,7 @@ struct ItemLibrary: PagingLibrary, SearchablePagingLibrary, WithRandomElementLib
         case .studio:
             parameters.studioIDs = [parentID]
         default:
-            break
+            parameters.parentID = parentID
         }
 
         return parameters
@@ -205,16 +204,24 @@ struct ItemLibrary: PagingLibrary, SearchablePagingLibrary, WithRandomElementLib
 
     private func attachFilters(
         to parameters: Paths.GetItemsParameters,
-        using filters: ItemFilterCollection,
-        isLetterFilterIncluded: Bool = true
+        using filters: ItemFilterCollection
     ) -> Paths.GetItemsParameters {
         var parameters = parameters
+        parameters.audioLanguages = filters.audioLanguages.map(\.value)
         parameters.filters = filters.traits
         parameters.genres = filters.genres.map(\.value)
+        parameters.officialRatings = filters.officialRatings.map(\.value)
         parameters.sortBy = filters.sortBy
         parameters.sortOrder = filters.sortOrder
+        parameters.subtitleLanguages = filters.subtitleLanguages.map(\.value)
         parameters.tags = filters.tags.map(\.value)
         parameters.years = filters.years.compactMap { Int($0.value) }
+
+        parameters.isMovie = filters.categories.contains(.movies) ? true : nil
+        parameters.isSeries = filters.categories.contains(.series) ? true : nil
+        parameters.isNews = filters.categories.contains(.news) ? true : nil
+        parameters.isKids = filters.categories.contains(.kids) ? true : nil
+        parameters.isSports = filters.categories.contains(.sports) ? true : nil
 
         if let query = filters.query {
             parameters.searchTerm = query
@@ -224,15 +231,12 @@ struct ItemLibrary: PagingLibrary, SearchablePagingLibrary, WithRandomElementLib
             parameters.includeItemTypes = filters.itemTypes
         }
 
-        guard isLetterFilterIncluded else { return parameters }
-
-        if filters.letter.first?.value == "#" {
-            parameters.nameLessThan = "A"
-        } else {
-            parameters.nameStartsWith = filters.letter
-                .map(\.value)
-                .filter { $0 != "#" }
-                .first
+        if let letter = filters.letter.first {
+            if letter.value == "#" {
+                parameters.nameLessThan = "A"
+            } else {
+                parameters.nameStartsWith = letter.value
+            }
         }
 
         return parameters
@@ -263,6 +267,10 @@ private struct ItemLibraryBody<Content: View>: View {
     private let content: Content
     private let filterViewModel: FilterViewModel
 
+    private var filterTypes: [ItemFilterType] {
+        enabledDrawerFilters.filter { !filterViewModel.staticFilters.containsFilters(ofType: $0) }
+    }
+
     init(
         filterViewModel: FilterViewModel,
         viewModel: PagingLibraryViewModel<ItemLibrary>,
@@ -273,59 +281,44 @@ private struct ItemLibraryBody<Content: View>: View {
         self.content = content()
     }
 
-    // tvOS gets no navigation bar chrome here to hang a toolbar off of - a
-    // ToolbarItem in this view simply doesn't render - so the bar takes real
-    // layout space above the grid. zIndex keeps the focused card's border
-    // above the posters; without it the grid wins and clips the highlight.
-    @ViewBuilder
-    private var platformContent: some View {
-        #if os(tvOS)
-        VStack(spacing: 0) {
-            FilterBar(viewModel: filterViewModel)
-                .padding(.top, 40)
-                .padding(.horizontal, 50)
-                .padding(.bottom, 20)
-                .zIndex(1)
-
-            content
-        }
-        #else
-        content
-        #endif
-    }
-
     var body: some View {
-        platformContent
-            .letterPickerBar(filterViewModel: filterViewModel)
+        content
             .onFirstAppear {
                 Task {
                     await filterViewModel.getQueryFilters()
                 }
             }
-            .backport
-            .onChange(of: filterViewModel.currentFilters) { _, newFilters in
-                rememberSort(from: newFilters)
+            .onChange(of: filterViewModel.currentFilters) {
+                rememberSort(from: filterViewModel.currentFilters)
             }
             .onReceive(
                 filterViewModel.$currentFilters
-                    .dropFirst()
+                    .map { filterViewModel.staticFilters.union($0) }
                     .removeDuplicates()
                     .debounce(for: 1, scheduler: RunLoop.main)
             ) { filters in
+                guard viewModel.environment.filters != filters else { return }
                 viewModel.environment.filters = filters
             }
-        #if os(tvOS)
+            #if os(tvOS)
+            .filterBar(
+                viewModel: filterViewModel,
+                types: filterTypes
+            )
+            #endif
+            .letterPickerBar(filterViewModel: filterViewModel)
+            #if os(tvOS)
             .background(alignment: .top) {
                 if !router.isRootOfPath {
                     FocusedPosterCinematicBackgroundView()
                 }
             }
-        #else
+            #else
             .navigationBarFilterDrawer(
                 viewModel: filterViewModel,
-                types: enabledDrawerFilters
+                types: filterTypes
             )
-        #endif
+            #endif
     }
 
     private func rememberSort(from filters: ItemFilterCollection) {

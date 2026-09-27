@@ -52,7 +52,7 @@ struct PillGroup<Element: Displayable>: ContentGroup {
         var body: some View {
             ContentGroupSection {
                 ScrollView(.horizontal) {
-                    HStack(spacing: PosterHStackMetrics.itemSpacing) {
+                    HStack(spacing: EdgeInsets.itemSpacing) {
                         ForEach(elements) { element in
                             Button {
                                 action(router, element)
@@ -60,21 +60,18 @@ struct PillGroup<Element: Displayable>: ContentGroup {
                                 if let imageable = element as? SystemImageable {
                                     Label(element.displayTitle, systemImage: imageable.systemImage)
                                 } else {
-                                    EmptyLabel(element.displayTitle)
+                                    Text(element.displayTitle)
                                 }
                             }
                             .foregroundStyle(.primary, .secondary)
-                            .font(.callout)
-                            .fontWeight(.semibold)
-                            .labelStyle(CapsuleLabelStyle())
-                            .buttonBorderShape(.capsule)
-                            .buttonStyle(.card)
                         }
                     }
+                    .labelStyle(.leadingIcon)
+                    .buttonStyle(.capsule)
+                    .controlSize(UIDevice.isTV ? .large : .regular)
                     .edgePadding(.horizontal)
                 }
                 .scrollIndicators(.hidden)
-                .backport
                 .scrollClipDisabled()
             } header: {
                 if displayTitle.isNotEmpty {
@@ -86,6 +83,8 @@ struct PillGroup<Element: Displayable>: ContentGroup {
                 }
             }
             .focusSection()
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(displayTitle)
         }
     }
 }

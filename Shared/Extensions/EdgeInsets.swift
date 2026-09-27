@@ -10,6 +10,15 @@ import SwiftUI
 
 extension EdgeInsets {
 
+    static func + (lhs: EdgeInsets, rhs: CGFloat) -> EdgeInsets {
+        .init(
+            top: lhs.top + rhs,
+            leading: lhs.leading + rhs,
+            bottom: lhs.bottom + rhs,
+            trailing: lhs.trailing + rhs
+        )
+    }
+
     // TODO: finalize tvOS
     /// The padding for Views against contextual edges,
     /// typically the edges of the View's scene
@@ -26,6 +35,15 @@ extension EdgeInsets {
     }()
 
     static let edgeInsets: EdgeInsets = .init(edgePadding)
+
+    /// The gap between collection items
+    static let itemSpacing: CGFloat = {
+        #if os(tvOS)
+        40
+        #else
+        10
+        #endif
+    }()
 
     init(_ constant: CGFloat) {
         self.init(top: constant, leading: constant, bottom: constant, trailing: constant)

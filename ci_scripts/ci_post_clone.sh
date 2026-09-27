@@ -1,11 +1,9 @@
 #!/bin/bash
 set -e
 
-brew install carthage swiftformat swiftgen
+brew install swiftformat swiftlint
 
-carthage update --use-xcframeworks --cache-builds
-
-# Swiftfin 1.5 pulls swift-case-paths, StatefulMacro, Engine and Defaults as
+# Swiftfin pulls swift-case-paths, StatefulMacro, Engine and Defaults as
 # macro packages. Xcode fingerprints those and refuses to run them until a human
 # clicks "Trust & Enable", which a CI runner has no way to do.
 #
