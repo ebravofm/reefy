@@ -1,20 +1,21 @@
 # What Reefy adds on top of Swiftfin
 
 Reefy is a tvOS-only fork of [Swiftfin](https://github.com/jellyfin/swiftfin). It tracks
-upstream closely and rebases onto it rather than drifting — the current base is
-**Swiftfin 1.5** (`7891e273`, Content Groups #2075), adopted 2026-07-26 and shipping as
-Reefy 2.0.0.
+upstream closely and merges from it rather than drifting — the current base is Swiftfin
+**`main` at `be3ce011`** (past 1.6.1), merged 2026-09-27. The previous base was 1.5
+(`7891e273`), adopted 2026-07-26 for Reefy 2.0.
 
 Everything below is a deliberate divergence from that base. Anything not listed here
-behaves the way upstream Swiftfin does.
+behaves the way upstream Swiftfin does. The list is meant to shrink: general fixes go
+upstream as PRs, and an entry comes off once upstream has it.
 
 Two things shape the list:
 
 - **tvOS only.** Upstream splits effort across iOS and tvOS, and the big screen tends to
   come second. Several entries exist because a feature shipped for iOS and never got a
-  tvOS entry point.
-- **VLC only.** AVKit playback was removed on 2026-01-28. One player path means the
-  player fixes below don't have to hold for two backends.
+  tvOS entry point. The iOS target stays in the project so upstream merges stay clean.
+- **VLC first.** VLC is the default player. Upstream's Native and MPV players are left in
+  rather than stripped, but the player fixes below are only built and verified against VLC.
 
 ---
 
@@ -60,17 +61,13 @@ write `enableNextEpisodeAutoPlay` on the Jellyfin account, so removing the AutoP
 from the toolbar silently turned autoplay off server-wide and undid the toggle in settings.
 The settings toggle is now the only thing that writes that flag.
 
-**Position marker on the transport tick.** Upstream drops the chapter tick entirely while the
-slider holds focus, leaving only the fill edge. Reefy keeps it on screen and colors it orange
-so there's still a place marker while scrubbing.
-
 **Episode name and year in the overlay title.** The subtitle carries season/episode, episode
 name, and year, dropping whichever parts are missing. Movies pick up a year where they had no
 subtitle at all.
 
 ---
 
-## Home and libraries
+## Home
 
 **Home rows refresh after playback.** Nothing in upstream's player tells the rest of the app
 that playback stopped, so Next Up and Continue Watching keep showing the episode you just
@@ -78,24 +75,20 @@ finished. Reefy awaits the stop report, re-reads the item, then posts the user-d
 refresh machinery is already listening for. The await matters — posting first races the server
 and reads back the pre-playback state.
 
-**Filter bar on tvOS.** Upstream gives tvOS a cinematic background where iOS gets the filter
-drawer, so there was no way to reach filters on the big screen at all. The filter stack is
-already shared; this adds the entry point — a capsule per enabled filter, sitting above the
-grid in the page flow.
+Upstream has the same fix in review as part of its live socket updates (Swiftfin #2265). This
+comes off once that lands.
 
 ---
 
 ## Interface
 
-**Icon-only tab bar.** Six tabs with text ran most of the screen width. Icons only, with the
-title revealed under the focus cursor. The title is passed to the style separately so
-VoiceOver still announces the tab.
-
 **Coral accent by default** (`#FF7F50`, sampled off the jellyfish in the app icon), replacing
-upstream's purple in all three places it was baked in.
+upstream's hardcoded purple wherever it's baked in — the accent defaults, sign-in buttons, and
+the played tint. The color picker's Jellyfin option stays purple since that's what it names.
 
-**Reefy identity** — bundle id, display name, `reefy://` URL scheme, app icon, top shelf art,
-and logo throughout settings, about, and login.
+**Reefy identity** — bundle id, display name, app icon, top shelf art, and logo throughout
+settings, about, and login. Deep links answer `reefy://` and the generic `jellyfin://`, but not
+`swiftfin://`, so links meant for official Swiftfin still go to it when both are installed.
 
 ---
 
@@ -116,16 +109,26 @@ everywhere a release year is shown. `yyyy` is the calendar year.
 ## Not yet carried forward
 
 These shipped in the pre-rebase Reefy line (frozen at `reefy-1.4.3-final`) and have not been
-ported to the 1.5 base. Listed so they don't get quietly forgotten.
+ported to the current base. Listed so they don't get quietly forgotten.
 
 | | Notes |
 |---|---|
 | Audio output mode setting | System Default / Auto / Stereo / Passthrough. Reefy #19, #55. Still advertised in `CHANGELOG.md`. |
-| Pre-play subtitle picker | A captions menu next to Play on the item screen. Reefy #5. The in-player picker still works. |
+| Pre-play subtitle picker | A captions menu next to Play on the item screen. Reefy #5. Upstream #2202 moved track and version selection into the item page's action buttons, which may cover this — check on device before porting anything. |
 | Menu at tab roots returns to Home | Separate from the in-player fix above. |
 | Menu inside pushed settings screens | Focused menu rows eat the press and the app suspends. |
 | Test target | `Swiftfin tvOS Tests/` was deleted by the rebase; roughly 480 lines of player and subtitle tests went with it. Restoring it needs `project.pbxproj` work. |
-| Home refresh on foreground | The `didRequestGlobalRefresh` key still exists with nothing posting or observing it. |
+| Home refresh on foreground | The `didRequestGlobalRefresh` key still exists with nothing posting or observing it. Upstream #2265 wires it up if it lands. |
+
+### Replaced by upstream
+
+Dropped in the 2026-09 merge because upstream shipped its own:
+
+| Reefy had | Upstream now |
+|---|---|
+| tvOS filter bar | tvOS Filters (#2321) |
+| Icon-only tab bar | Sidebar tab bar (#2107), with a Sidebar / Centered setting (#2256) |
+| Orange position marker on the transport tick | The slider it lived on was rewritten (#2293) and no longer has a tick |
 
 Deliberately **not** restored: auto-marking an episode played at 95%. It cleared the Next Up
 row a little faster, but quitting at 95% marked the episode watched when you hadn't finished
