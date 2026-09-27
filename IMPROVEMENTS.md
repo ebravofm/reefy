@@ -100,9 +100,11 @@ the keychain beside the access token. Quick Connect uses the same client to init
 redeem, since the secret is redeemed against the device that started the exchange. Users
 stored without one fall back to the legacy derived id. (Reefy #57)
 
-**Release year off by one.** `premiereDateYear` used the format `YYYY` — the ISO *week*-based
-year — so anything airing in the days either side of New Year reported the wrong year
-everywhere a release year is shown. `yyyy` is the calendar year.
+**Release year off by one.** `premiereDateYear` used the format `YYYY` — the *week*-based
+year — so anything airing in the days either side of New Year could report the wrong year
+everywhere a release year is shown. Which days flip depends on the locale's week rules (US
+pushes late December forward, ISO locales also pull early January back). `yyyy` is the
+calendar year.
 
 ---
 
