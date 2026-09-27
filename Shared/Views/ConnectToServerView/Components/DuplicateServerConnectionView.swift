@@ -57,7 +57,7 @@ extension ConnectToServerView {
                     .fontWeight(.semibold)
                     .backport
                     .buttonStyle(.glassProminent.shadow(false))
-                    .tint(.jellyfinPurple)
+                    .tint(.reefyCoral)
                     #if os(iOS)
                     .controlSize(.large)
                     #endif

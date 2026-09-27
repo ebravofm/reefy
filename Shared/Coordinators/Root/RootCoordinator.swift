@@ -41,7 +41,7 @@ final class RootCoordinator: ObservableObject {
     }
 
     private var started = false
-    private var selectedAccentColor: Color = .jellyfinPurple
+    private var selectedAccentColor: Color = .reefyCoral
     private var accentColorCancellable: AnyCancellable?
     private var appearanceCancellable: AnyCancellable?
     private var currentSessionCancellable: AnyCancellable?
