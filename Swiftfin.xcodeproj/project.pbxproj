@@ -479,6 +479,7 @@
 				5358705D2669D21600D05A09 /* Frameworks */,
 				5358705E2669D21600D05A09 /* Resources */,
 				E19009182F00000000000002 /* Write Git Branch */,
+				E1F0A6E42F00000000000001 /* Strip arm64e */,
 			);
 			buildRules = (
 			);
@@ -860,6 +861,22 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"${SRCROOT}/Scripts/WriteGitBranch.sh\"\n";
+		};
+		E1F0A6E42F00000000000001 /* Strip arm64e */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Scripts/StripArm64e.sh",
+			);
+			name = "Strip arm64e";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/Scripts/StripArm64e.sh\"\n";
 		};
 		E1A1B5C42F00000000000001 /* Run SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
