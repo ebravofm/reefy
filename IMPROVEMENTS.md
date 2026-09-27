@@ -106,6 +106,12 @@ everywhere a release year is shown. Which days flip depends on the locale's week
 pushes late December forward, ISO locales also pull early January back). `yyyy` is the
 calendar year.
 
+**App Store builds strip arm64e.** Upstream's MPV player (#2274) pulls in MPVUI, whose tvOS
+`Libmpv.xcframework` ships arm64 *and* arm64e. App Store Connect rejects arm64e in third-party
+apps, so the 2.1.0 upload bounced. `Scripts/StripArm64e.sh` runs as the last tvOS build phase,
+removes the slice, and re-signs the framework. Upstream hasn't shipped a build with MPV yet, so
+it hasn't hit this; comes off once MPVUI drops arm64e or Swiftfin handles it.
+
 ---
 
 ## Not yet carried forward
